@@ -22,7 +22,7 @@ New-OutboundConnector -Name "Sigwide" -ConnectorType OnPremises -IsTransportRule
   -CloudServicesMailEnabled $true
 
 # 2) Gelen bağlayıcı: Sigwide'dan dönen postaları sertifikasından tanır
-New-InboundConnector -Name "Sigwide" -ConnectorType OnPremises -SenderDomains * \`
+New-InboundConnector -Name "Sigwide geri donus" -ConnectorType OnPremises -SenderDomains * \`
   -RequireTls $true -TlsSenderCertificateName $Role \`
   -CloudServicesMailEnabled $true
 
