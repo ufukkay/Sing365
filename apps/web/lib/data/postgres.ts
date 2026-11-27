@@ -153,5 +153,19 @@ export function postgresData(db: Db): DataLayer {
         error: r.error ?? undefined,
       };
     },
+    async createTemplateWithRule(tenantId, input) {
+      return db.forTenant(tenantId, async (tx) => {
+        const [t] = await tx<{ id: string }[]>`
+          insert into templates (tenant_id, kind, name, layout, status, sort_order)
+          values (${tenantId}, ${input.kind}, ${input.name}, ${tx.json(input.layout as never)}, ${input.status}, ${input.priority})
+          returning id`;
+        if (!t) throw new Error("template insert returned no row");
+        await tx`
+          insert into rules (tenant_id, template_id, senders, recipients, exceptions, applies_to, enabled)
+          values (${tenantId}, ${t.id}, ${tx.json(input.rule.senders as never)}, ${tx.json(input.rule.recipients as never)},
+                  ${tx.json((input.rule.exceptions ?? {}) as never)}, ${input.rule.appliesTo}, ${input.rule.enabled ?? true})`;
+        return t.id;
+      });
+    },
   };
 }

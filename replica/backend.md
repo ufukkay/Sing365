@@ -25,7 +25,7 @@ Decision change from architecture.md: the `postgres` driver with SQL instead of 
 
 ## Entra setup (development tenant)
 
-- App registration "Sing365 (geliştirme)", multi-tenant, redirect `http://localhost:3000/api/auth/callback/microsoft-entra-id`.
+- App registration "Sing365 (geliştirme)", multi-tenant, Web redirects `http://localhost:3000/api/auth/callback/microsoft-entra-id` (sign-in) and `http://localhost:3000/api/consent/callback` (organisation consent). Both are needed; a missing one fails with AADSTS50011.
 - Graph application permissions: `User.Read.All`, `GroupMember.Read.All`. Delegated: `User.Read` (+ openid, profile, email).
 - Still to do by a tenant admin: grant admin consent; create a client secret into `.env.local`; for Outlook SSO, "Expose an API" with Application ID URI `api://<host>/<client id>` and scope `access_as_user`, then set `ENTRA_API_AUDIENCE`.
 - Graph change notifications are not used yet (delta every 4 h is enough for signatures).

@@ -178,4 +178,12 @@ export const seedData: DataLayer = {
       ? { state: "succeeded", finishedAt: synced, usersChanged: users.length }
       : { state: "never", finishedAt: null, usersChanged: 0 };
   },
+  async createTemplateWithRule(tenantId, input) {
+    if (tenantId !== SEED_TENANT_ID) throw new Error("unknown tenant");
+    // Demo mode keeps it in memory until the dev server restarts.
+    const id = `t-${templates.length + 1}-${Date.now()}`;
+    templates.push({ id, name: input.name, kind: input.kind, status: input.status, version: 1, layout: input.layout, updatedAt: new Date().toISOString() });
+    rules.push({ id: `r-${id}`, templateId: id, priority: input.priority, enabled: input.rule.enabled ?? true, ...input.rule });
+    return id;
+  },
 };

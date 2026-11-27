@@ -3,6 +3,7 @@ import postgres from "postgres";
 import { createDb, upsertTenantOnConsent, upsertUsers, type Db } from "@sing365/db";
 import { postgresData } from "../lib/data/postgres";
 import { buildSignature } from "../lib/signature";
+import { addStarterTemplates } from "../lib/starter";
 
 const ADMIN_URL = process.env.TEST_DATABASE_URL;
 const APP_URL = process.env.TEST_APP_DATABASE_URL;
@@ -49,5 +50,30 @@ describe.runIf(ADMIN_URL && APP_URL)("Postgres data layer + signature", () => {
     const data = postgresData(db);
     expect(await data.findUserByEmail(other, "ayse@data.com.tr")).toBeNull();
     expect(await data.listTemplates(other)).toEqual([]);
+  });
+
+  it("adds the starter signatures once; replies get the short one", async () => {
+    const tid = (await upsertTenantOnConsent(db, "55555555-5555-4555-8555-555555555555", "Yeni A.Ş.")).id;
+    await db.forTenant(tid, (tx) =>
+      upsertUsers(tx, tid, [
+        {
+          entraObjectId: "00000000-0000-4000-8000-0000000000d1", email: "mehmet@yeni.com.tr", aliases: [],
+          displayName: "Mehmet", givenName: null, surname: null, jobTitle: "Uzman", department: null, companyName: "Yeni",
+          officeLocation: null, businessPhone: null, mobilePhone: null, streetAddress: null, city: null, country: null,
+          managerEntraId: null, extensionAttrs: {}, accountEnabled: true, mailboxType: "user",
+        },
+      ]),
+    );
+    const data = postgresData(db);
+    const fullId = await addStarterTemplates(data, tid);
+    expect(await addStarterTemplates(data, tid)).toBe(fullId);
+    expect((await data.listTemplates(tid)).map((t) => t.name).sort()).toEqual(["Kurumsal (tam)", "Yanıt (kısa)"]);
+    expect(await data.listTemplates(tenantId)).toHaveLength(1);
+
+    const fresh = await buildSignature(data, { tenantId: tid, from: "mehmet@yeni.com.tr", mode: "new", recipients: [] });
+    expect(fresh.ok && fresh.templateId).toBe(fullId);
+    const reply = await buildSignature(data, { tenantId: tid, from: "mehmet@yeni.com.tr", mode: "reply", recipients: [] });
+    expect(reply.ok && reply.html).toContain("Mehmet | Uzman");
+    expect(reply.ok && reply.templateId).not.toBe(fullId);
   });
 });

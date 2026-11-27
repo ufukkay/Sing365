@@ -63,6 +63,17 @@ export interface SyncStatus {
   error?: string;
 }
 
+/** A new template together with the one rule that decides who gets it. */
+export interface NewTemplate {
+  name: string;
+  kind: Template["kind"];
+  status: Template["status"];
+  layout: Layout;
+  /** Lower runs first. Stored as the template's sort order. */
+  priority: number;
+  rule: Pick<Rule, "senders" | "recipients" | "appliesTo"> & Partial<Pick<Rule, "exceptions" | "enabled">>;
+}
+
 export interface DataLayer {
   getTenant(tenantId: string): Promise<Tenant | null>;
   getTenantByEntraId(entraTenantId: string): Promise<Tenant | null>;
@@ -75,4 +86,6 @@ export interface DataLayer {
   getTemplate(tenantId: string, templateId: string): Promise<Template | null>;
   listRules(tenantId: string): Promise<Rule[]>;
   getSyncStatus(tenantId: string): Promise<SyncStatus>;
+  /** Saves a template and its rule together. Returns the new template id. */
+  createTemplateWithRule(tenantId: string, input: NewTemplate): Promise<string>;
 }

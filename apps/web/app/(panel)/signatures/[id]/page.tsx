@@ -25,14 +25,16 @@ export default async function SignaturePreview({
   params: Promise<{ id: string }>;
   searchParams: Promise<{ user?: string; mode?: string; to?: string }>;
 }) {
-  const { tenantId } = await requirePanel();
+  const { tenantId, session } = await requirePanel();
   const { id } = await params;
   const sp = await searchParams;
   const template = await data.getTemplate(tenantId, id);
   if (!template) notFound();
 
   const users = await data.listUsers(tenantId);
-  const user = users.find((u) => u.id === sp.user) ?? users[0];
+  // Default to the signed-in admin's own directory entry, so they see their own signature first.
+  const me = !sp.user && session ? await data.findUserByEmail(tenantId, session.email) : null;
+  const user = (sp.user ? users.find((u) => u.id === sp.user) : me) ?? users[0];
   const mode = sp.mode === "reply" ? "reply" : "new";
   const to = sp.to ?? "musteri@baskafirma.com";
 
