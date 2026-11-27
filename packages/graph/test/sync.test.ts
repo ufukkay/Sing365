@@ -76,7 +76,10 @@ describe.runIf(ADMIN_URL && APP_URL)("syncTenant against Postgres", () => {
         },
       ],
       [`${G}/users/delta?token=1`]: [
-        { value: [graphUser(U1, "ayse@test.com.tr", { jobTitle: "Müdür" }), { id: U2, "@removed": { reason: "deleted" } }], "@odata.deltaLink": `${G}/users/delta?token=2` },
+        {
+          value: [{ id: U2, "@removed": { reason: "deleted" } }, graphUser(U1, "ayse@test.com.tr", { jobTitle: "Müdür" }), graphUser(U3, null)],
+          "@odata.deltaLink": `${G}/users/delta?token=2`,
+        },
       ],
       [`${G}/groups/delta?token=1`]: [
         { value: [{ id: G1, displayName: "Satış", "members@delta": [{ id: U1, "@removed": { reason: "deleted" } }] }], "@odata.deltaLink": `${G}/groups/delta?token=2` },
@@ -104,6 +107,42 @@ describe.runIf(ADMIN_URL && APP_URL)("syncTenant against Postgres", () => {
     ]);
     const m2 = await db.forTenant(tenantId, (tx) => tx`select count(*)::int as n from group_members`);
     expect(m2[0]!.n).toBe(0);
+  });
+
+  it("requests only needed fields and restarts only user delta when the scope changes", async () => {
+    const userUrl = `${G}${USERS_DELTA_START}`;
+    const firstStart = `${userUrl},businessPhones,onPremisesExtensionAttributes`;
+    const nextStart = `${userUrl},mobilePhone,onPremisesExtensionAttributes`;
+    const firstDelta = `${G}/users/delta?token=work-phone`;
+    const groupsDelta = `${G}/groups/delta?token=groups`;
+    const person = graphUser(U1, "ayse@test.com.tr", {
+      mobilePhone: "+90 500 000 00 00",
+      onPremisesExtensionAttributes: { extensionAttribute1: "Türkçe unvan", extensionAttribute2: "İkinci alan" },
+    });
+    const { impl, calls } = fakeFetch({
+      [firstStart]: [{ value: [person], "@odata.deltaLink": firstDelta }],
+      [firstDelta]: [{ value: [], "@odata.deltaLink": firstDelta }],
+      [nextStart]: [{ value: [person], "@odata.deltaLink": `${G}/users/delta?token=mobile` }],
+      [`${G}${GROUPS_DELTA_START}`]: [{ value: [], "@odata.deltaLink": groupsDelta }],
+      [groupsDelta]: [{ value: [], "@odata.deltaLink": groupsDelta }, { value: [], "@odata.deltaLink": groupsDelta }],
+    });
+    const graph = new GraphClient("tid", { clientId: "c", clientSecret: "s" }, impl);
+    const firstFields = new Set(["business_phone", "ext.extensionattribute1"]);
+    expect(await syncTenant(db, graph, tenantId, { fields: firstFields })).toMatchObject({ ok: true, kind: "full" });
+    const stored = () => db.forTenant(tenantId, (tx) => tx`select business_phone, mobile_phone, extension_attrs from directory_users`);
+    expect((await stored())[0]).toEqual({
+      business_phone: "+90 212 000 00 00", mobile_phone: null, extension_attrs: { extensionattribute1: "Türkçe unvan" },
+    });
+    expect(await syncTenant(db, graph, tenantId, { fields: firstFields })).toMatchObject({ ok: true, kind: "delta" });
+    const newFields = new Set(["mobile_phone", "ext.extensionattribute2"]);
+    expect(await syncTenant(db, graph, tenantId, { fields: newFields })).toMatchObject({ ok: true, kind: "full" });
+    expect(calls.filter((url) => url.startsWith(G))).toEqual([
+      firstStart, `${G}${GROUPS_DELTA_START}`, firstDelta, groupsDelta, nextStart, groupsDelta,
+    ]);
+    expect((await stored())[0]).toEqual({
+      business_phone: "+90 212 000 00 00", mobile_phone: "+90 500 000 00 00",
+      extension_attrs: { extensionattribute1: "Türkçe unvan", extensionattribute2: "İkinci alan" },
+    });
   });
 
   it("restarts with a full sync when Graph says the delta token expired", async () => {
@@ -159,5 +198,13 @@ describe("mapUser", () => {
 
   it("turns empty strings into null", () => {
     expect(mapUser(graphUser(U1, "a@x.com", { jobTitle: "  ", businessPhones: [] }))).toMatchObject({ jobTitle: null, businessPhone: null });
+  });
+
+  it("keeps only selected fields from Graph's extension attribute object", () => {
+    const user = graphUser(U1, "a@x.com", {
+      onPremisesExtensionAttributes: { extensionAttribute1: "Kullanılan", extensionAttribute2: "Fazladan" },
+    });
+    expect(mapUser(user, ["extensionattribute1"])?.extensionAttrs).toEqual({ extensionAttribute1: "Kullanılan" });
+    expect(mapUser(user, [])?.extensionAttrs).toEqual({});
   });
 });

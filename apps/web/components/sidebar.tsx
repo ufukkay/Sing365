@@ -2,12 +2,13 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { BarChart3, LayoutDashboard, Megaphone, PenLine, Plug, Settings, Users } from "lucide-react";
+import { BarChart3, LayoutDashboard, Megaphone, PenLine, Plug, Send, Settings, Users } from "lucide-react";
 import { cx } from "./ui";
 
 const nav = [
   { href: "/", label: "Genel bakış", icon: LayoutDashboard },
   { href: "/signatures", label: "İmzalar", icon: PenLine },
+  { href: "/signatures/apply", label: "İmza uygulama", icon: Send },
   { href: "/users", label: "Kişiler", icon: Users },
   { href: "/exchange", label: "Exchange bağlantısı", icon: Plug },
   { href: "/campaigns", label: "Kampanyalar", icon: Megaphone, soon: true },
@@ -20,7 +21,9 @@ export function Sidebar() {
   return (
     <nav aria-label="Ana menü" className="flex flex-col gap-1 p-3">
       {nav.map(({ href, label, icon: Icon, soon }) => {
-        const active = href === "/" ? path === "/" : path.startsWith(href);
+        const active = href === "/"
+          ? path === "/"
+          : path === href || (path.startsWith(`${href}/`) && !(href === "/signatures" && path === "/signatures/apply"));
         if (soon)
           return (
             <span key={href} className="flex items-center gap-3 rounded-md px-3 py-2 text-sm text-text-muted" aria-disabled="true">

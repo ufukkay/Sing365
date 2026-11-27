@@ -7,8 +7,8 @@ import { data } from "@/lib/data";
 import { requirePanel } from "@/lib/context";
 import { FIELD_HELP, htmlOf } from "@/lib/html-template";
 import { buildSignature, fieldValues } from "@/lib/signature";
-import { parseVisualLayout, simpleVisualRule, visualFields, visualSampleSources } from "@/lib/visual-signature";
-import { changeVisualTemplateStatusAction, duplicateVisualTemplateAction } from "../actions";
+import { parseVisualLayout, visualFields, visualSampleSources } from "@/lib/visual-signature";
+import { duplicateVisualTemplateAction } from "../actions";
 
 export const metadata = { title: "İmza önizleme" };
 
@@ -27,7 +27,7 @@ export default async function SignaturePreview({
   searchParams,
 }: {
   params: Promise<{ id: string }>;
-  searchParams: Promise<{ user?: string; email?: string; mode?: string; to?: string; notice?: string }>;
+  searchParams: Promise<{ user?: string; email?: string; mode?: string; to?: string }>;
 }) {
   const { tenantId, session } = await requirePanel();
   const { id } = await params;
@@ -61,13 +61,6 @@ export default async function SignaturePreview({
   const isHtml = htmlOf(template) !== null;
   const visual = template.kind === "signature" && Boolean(parseVisualLayout(template.layout).layout);
   const editable = visual && template.status !== "archived";
-  const placement = editable ? simpleVisualRule((await data.listRules(tenantId)).filter((r) => r.templateId === id)) : undefined;
-  const sender = placement?.senders.groups?.[0];
-  const messageType = { new: "Yeni e-postalar", reply: "Yanıtlar ve iletmeler", both: "Tüm ileti türleri" };
-  const recipientScope = { any: "Tüm alıcılar", internal: "Şirket içi", external: "Şirket dışı" };
-  const notice = sp.notice === "empty" ? "Yayımlamak için imzaya bir içerik bloğu ekleyin."
-    : sp.notice === "rule" ? "Yayımlamak için etkin bir uygulama kuralı gerekiyor."
-    : sp.notice === "conflict" ? "Şablon değişti. Geçerli sürümü kontrol edip yeniden deneyin." : null;
 
   return (
     <>
@@ -76,6 +69,11 @@ export default async function SignaturePreview({
         description="Bu imzanın seçilen kişide nasıl göründüğünü ve o kişinin gerçekte hangi imzayı aldığını gösterir."
         actions={
           <div className="flex flex-wrap items-center gap-4">
+            {template.kind === "signature" && template.status !== "archived" && (
+              <Link href={{ pathname: "/signatures/apply", query: { template: id } }} className="inline-flex h-9 items-center rounded-md bg-accent px-4 text-sm font-semibold text-on-accent hover:bg-accent-hover">
+                Uygulama ayarları
+              </Link>
+            )}
             {editable && (
               <Link href={`/signatures/${template.id}/edit`} className="text-sm font-medium text-accent underline">
                 Düzenle
@@ -135,29 +133,9 @@ export default async function SignaturePreview({
         </Card>
 
         <div className="flex min-w-0 flex-col gap-6">
-          {editable && (
-            <Card title="Uygulama" actions={
-              <form action={changeVisualTemplateStatusAction}>
-                <input type="hidden" name="id" value={id} />
-                <input type="hidden" name="version" value={template.version} />
-                <input type="hidden" name="status" value={template.status === "draft" ? "published" : "draft"} />
-                <Button variant={template.status === "draft" ? "primary" : "secondary"} type="submit">
-                  {template.status === "draft" ? "Yayımla" : "Yayından kaldır"}
-                </Button>
-              </form>
-            }>
-              {notice && <p role="alert" className="mb-3 text-sm text-danger">{notice}</p>}
-              {placement && (
-                <p className="text-sm text-text-muted">
-                  {sender ? groups.find((group) => group.id === sender)?.displayName ?? "Dizin grubu" : "Tüm gönderenler"}
-                  {" · "}{messageType[placement.appliesTo]}{" · "}{recipientScope[placement.recipients.scope]}{" · "}Öncelik {placement.priority}
-                </p>
-              )}
-            </Card>
-          )}
           <Card
             title="Bu imza"
-            actions={template.status === "published" ? <Badge tone="success">Yayında · v{template.version}</Badge> : <Badge>{template.status === "archived" ? "Arşivde" : "Taslak"}</Badge>}
+            actions={template.status === "published" ? <Badge tone="success">Aktif · v{template.version}</Badge> : <Badge>{template.status === "archived" ? "Arşiv" : "Taslak"}</Badge>}
           >
             {!user && <p className="mb-3 text-sm text-text-muted">Örnek kullanıcı bilgileriyle gösteriliyor.</p>}
             <iframe

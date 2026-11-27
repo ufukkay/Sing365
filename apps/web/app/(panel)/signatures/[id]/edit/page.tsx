@@ -5,7 +5,7 @@ import { Card, PageHeader } from "@/components/ui";
 import { requirePanel } from "@/lib/context";
 import { data } from "@/lib/data";
 import { fieldValues } from "@/lib/signature";
-import { parseVisualLayout, simpleVisualRule, visualFields, visualProfiles, visualSampleSources } from "@/lib/visual-signature";
+import { parseVisualLayout, visualFields, visualSampleSources } from "@/lib/visual-signature";
 import { previewVisualTemplateAction, saveVisualTemplateAction } from "../../actions";
 
 export const metadata = { title: "İmzayı düzenle" };
@@ -33,25 +33,16 @@ export default async function EditSignature({ params }: { params: Promise<{ id: 
     );
   }
 
-  const [me, groups, rules] = await Promise.all([
-    session ? data.findUserByEmail(tenantId, session.email) : null,
-    data.listGroups(tenantId),
-    data.listRules(tenantId),
-  ]);
-  const rule = simpleVisualRule(rules.filter((entry) => entry.templateId === id));
+  const me = session ? await data.findUserByEmail(tenantId, session.email) : null;
   const sources = me ? [{ label: `Dizin · ${me.displayName}`, values: fieldValues(me) }, ...visualSampleSources] : visualSampleSources;
 
   return (
     <>
       {header}
       <SignatureDesigner
-        initial={{
-          id, name: template.name, layout: parsed.layout, status: template.status, version: template.version,
-          managedRule: Boolean(rule), appliesTo: rule?.appliesTo, priority: rule?.priority,
-          senderGroup: rule?.senders.groups?.[0], recipientScope: rule?.recipients.scope,
-        }}
+        initial={{ id, name: template.name, layout: parsed.layout, status: template.status, version: template.version }}
         action={saveVisualTemplateAction} preview={previewVisualTemplateAction}
-        sources={sources} profiles={visualProfiles} fields={visualFields} groups={groups}
+        sources={sources} fields={visualFields}
       />
     </>
   );

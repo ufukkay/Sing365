@@ -24,50 +24,16 @@ export const visualFields: { key: string; label: string; group: string }[] = [
   })),
 ];
 
-const starterLayout: Layout = {
-  version: 1,
-  fontStack: "Arial, Helvetica, sans-serif",
-  baseSize: 13,
-  colors: { text: "#233047", link: "#174e9b", divider: "#c9d7ea" },
-  maxWidth: 440,
-  elements: [],
-};
-
-export const visualProfiles: { id: string; label: string; description: string; layout: Layout; appliesTo?: Rule["appliesTo"] }[] = [
-  {
-    id: "full",
-    label: "Kurumsal",
-    description: "Ad, unvan, şirket ve iletişim bilgileri",
-    appliesTo: "new",
-    layout: {
-      ...starterLayout,
-      elements: [
-        { type: "text", text: "{{display_name}}", style: { size: 18, bold: true } },
-        { type: "text", text: "{{job_title}}" },
-        { type: "text", text: "{{company_name}}", style: { bold: true, color: "#174e9b" } },
-        { type: "divider" },
-        { type: "text", text: "{{business_phone}}", href: "tel:{{business_phone}}" },
-        { type: "text", text: "{{email}}", href: "mailto:{{email}}" },
-        { type: "text", text: "{{office_location}}" },
-      ],
-    },
-  },
-  {
-    id: "reply",
-    label: "Kısa yanıt",
-    description: "Yanıtlar ve iletmeler için kısa bir imza",
-    appliesTo: "reply",
-    layout: {
-      ...starterLayout,
-      elements: [
-        { type: "text", text: "{{display_name}}", style: { bold: true } },
-        { type: "text", text: "{{job_title}}" },
-        { type: "text", text: "{{email}}", href: "mailto:{{email}}" },
-      ],
-    },
-  },
-  { id: "blank", label: "Boş tasarım", description: "Alanları ve blokları kendiniz ekleyin", layout: starterLayout },
-];
+export function hasSignatureContent(layout: Layout): boolean {
+  function hasContent(element: Element): boolean {
+    if (element.type === "text") return Boolean(element.text.trim());
+    if (element.type === "image") return true;
+    if (element.type === "social") return element.links.length > 0;
+    if (element.type === "html") return Boolean(element.html.trim());
+    return element.type === "columns" && element.columns.some((column) => column.elements.some(hasContent));
+  }
+  return Array.isArray(layout.elements) && layout.elements.some(hasContent);
+}
 
 export const visualSampleSources: { label: string; values: FieldValues }[] = [
   {

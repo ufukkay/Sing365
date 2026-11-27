@@ -131,18 +131,22 @@ const salesLayout: Layout = {
   ],
 };
 
-const templates: Template[] = [
+const initialTemplates: Template[] = [
   { id: "t-full", name: "Kurumsal (tam)", kind: "signature", status: "published", version: 3, layout: fullLayout, updatedAt: "2026-11-26T15:20:00Z" },
   { id: "t-reply", name: "Yanıt (kısa)", kind: "signature", status: "published", version: 1, layout: replyLayout, updatedAt: "2026-11-25T11:00:00Z" },
   { id: "t-sales", name: "Satış ekibi, dış alıcılar", kind: "signature", status: "published", version: 2, layout: salesLayout, updatedAt: "2026-11-26T16:45:00Z" },
   { id: "t-draft", name: "Yılbaşı kampanyası", kind: "signature", status: "draft", version: 0, layout: fullLayout, updatedAt: "2026-11-27T08:10:00Z" },
 ];
 
-const rules: Rule[] = [
+const initialRules: Rule[] = [
   { id: "r-reply", templateId: "t-reply", priority: 10, enabled: true, appliesTo: "reply", senders: { all: true }, recipients: { scope: "any" } },
   { id: "r-sales", templateId: "t-sales", priority: 20, enabled: true, appliesTo: "new", senders: { groups: ["g-sales"] }, recipients: { scope: "external" } },
   { id: "r-all", templateId: "t-full", priority: 100, enabled: true, appliesTo: "both", senders: { all: true }, recipients: { scope: "any" } },
 ];
+
+// Route bundles in a single demo process share the same drafts and application rules.
+const demo = globalThis as typeof globalThis & { sigwideDemoSignatures?: { templates: Template[]; rules: Rule[] } };
+const { templates, rules } = (demo.sigwideDemoSignatures ??= { templates: initialTemplates, rules: initialRules });
 
 const relayHashes = new Map<string, string>();
 
@@ -219,20 +223,38 @@ export const seedData: DataLayer = {
   async updateVisualTemplate(tenantId, templateId, input) {
     const template = byTenant(tenantId, templates).find((entry) => entry.id === templateId);
     if (!template || template.kind !== "signature" || template.version !== input.version || template.status === "archived") return false;
-    if (input.placement) {
-      const { ruleId, priority, senders, recipients, appliesTo } = input.placement;
-      const rule = byTenant(tenantId, rules).find((entry) => entry.id === ruleId && entry.templateId === templateId);
-      if (!rule) return false;
-      Object.assign(rule, { priority, senders, recipients, appliesTo });
-    }
     Object.assign(template, { name: input.name, layout: input.layout, version: template.version + 1, updatedAt: new Date().toISOString() });
     return true;
   },
-  async setVisualTemplateStatus(tenantId, templateId, version, status) {
+  async updateTemplateApplication(tenantId, templateId, input) {
     const template = byTenant(tenantId, templates).find((entry) => entry.id === templateId);
-    const expected = status === "draft" ? "published" : "draft";
-    if (!template || template.kind !== "signature" || template.version !== version || template.status !== expected) return false;
+    if (!template || template.kind !== "signature" || template.version !== input.version || template.status === "archived") return false;
+    const { ruleId, priority, senders, recipients, appliesTo, enabled } = input;
+    const templateRules = byTenant(tenantId, rules).filter((entry) => entry.templateId === templateId);
+    if (ruleId) {
+      const rule = templateRules.find((entry) => entry.id === ruleId);
+      if (!rule) return false;
+      Object.assign(rule, { priority, senders, recipients, appliesTo, enabled });
+    } else {
+      if (templateRules.length) return false;
+      rules.push({ id: `r-${templateId}`, templateId, priority, senders, recipients, appliesTo, enabled });
+    }
+    Object.assign(template, { version: template.version + 1, updatedAt: new Date().toISOString() });
+    return true;
+  },
+  async setVisualTemplateStatus(tenantId, templateId, version, status, previous) {
+    const template = byTenant(tenantId, templates).find((entry) => entry.id === templateId);
+    if (!template || template.kind !== "signature" || template.version !== version || template.status !== previous) return false;
     Object.assign(template, { status, version: template.version + 1, updatedAt: new Date().toISOString() });
+    return true;
+  },
+  async deleteArchivedTemplate(tenantId, templateId, version) {
+    const template = byTenant(tenantId, templates).find((entry) => entry.id === templateId);
+    if (!template || template.kind !== "signature" || template.status !== "archived" || template.version !== version) return false;
+    templates.splice(templates.indexOf(template), 1);
+    for (let index = rules.length - 1; index >= 0; index--) {
+      if (rules[index]?.templateId === templateId) rules.splice(index, 1);
+    }
     return true;
   },
 };

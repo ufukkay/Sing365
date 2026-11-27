@@ -112,6 +112,53 @@ export function placeholdersIn(s: string): string[] {
   return out;
 }
 
+/** Fields a signature can read, including conditions and placeholders in URLs. */
+export function layoutFields(layout: Layout): string[] {
+  const fields = new Set<string>();
+
+  function addPlaceholders(...sources: (string | undefined)[]) {
+    for (const source of sources) {
+      if (!source) continue;
+      for (const field of placeholdersIn(source)) fields.add(field);
+    }
+  }
+
+  function addSections(html: string) {
+    for (const section of html.matchAll(SECTION)) {
+      fields.add(section[2]!.toLowerCase());
+      addSections(section[3]!);
+    }
+  }
+
+  function visit(elements: Element[]) {
+    if (!Array.isArray(elements)) return;
+    for (const element of elements) {
+      if (!element) continue;
+      switch (element.type) {
+        case "text":
+          addPlaceholders(element.text, element.href);
+          break;
+        case "image":
+          addPlaceholders(element.src, element.alt, element.href);
+          break;
+        case "social":
+          for (const link of element.links) addPlaceholders(link.url, link.icon);
+          break;
+        case "html":
+          addPlaceholders(element.html);
+          addSections(element.html);
+          break;
+        case "columns":
+          for (const column of element.columns) visit(column.elements);
+          break;
+      }
+    }
+  }
+
+  visit(layout?.elements ?? []);
+  return [...fields].sort();
+}
+
 interface Ctx {
   values: FieldValues;
   missing: Set<string>;

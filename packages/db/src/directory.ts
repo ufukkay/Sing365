@@ -28,7 +28,13 @@ export interface DirectoryUserInput {
 export interface DirectoryGroupInput {
   entraObjectId: string;
   displayName: string;
-  mail: string | null;
+  mail?: string | null;
+}
+
+export interface DirectoryUserProjection {
+  /** Microsoft Graph properties included in this sync. */
+  properties: readonly string[];
+  extensionKeys: readonly string[];
 }
 
 export interface TenantRow {
@@ -65,27 +71,83 @@ export async function markConsentRevoked(db: Db, tenantId: string): Promise<void
   await db.sql`update tenants set consent_status = 'revoked' where id = ${tenantId}`;
 }
 
-export async function upsertUsers(tx: Tx, tenantId: string, users: DirectoryUserInput[]): Promise<number> {
+export async function upsertUsers(
+  tx: Tx,
+  tenantId: string,
+  users: DirectoryUserInput[],
+  projection?: DirectoryUserProjection,
+): Promise<number> {
+  const properties = projection && new Set(projection.properties);
+  const selected = (property: string) => properties?.has(property) ?? true;
+  const extensionKeys = new Set(
+    projection && selected("onPremisesExtensionAttributes")
+      ? projection.extensionKeys.map((key) => key.toLowerCase())
+      : [],
+  );
+  const keysToReplace = [...extensionKeys];
   let n = 0;
   for (const u of users) {
+    const extensions = projection
+      ? Object.fromEntries(
+          Object.entries(u.extensionAttrs)
+            .map(([key, value]) => [key.toLowerCase(), value] as const)
+            .filter(([key]) => extensionKeys.has(key)),
+        )
+      : u.extensionAttrs;
     await tx`
       insert into directory_users (
         tenant_id, entra_object_id, email, aliases, display_name, given_name, surname, job_title, department,
         company_name, office_location, business_phone, mobile_phone, street_address, city, state, postal_code, country,
         manager_entra_id, extension_attrs, account_enabled, mailbox_type, last_synced_at, deleted_at)
       values (
-        ${tenantId}, ${u.entraObjectId}, ${u.email.toLowerCase()}, ${u.aliases.map((a) => a.toLowerCase())}::citext[],
-        ${u.displayName}, ${u.givenName}, ${u.surname}, ${u.jobTitle}, ${u.department},
-        ${u.companyName}, ${u.officeLocation}, ${u.businessPhone}, ${u.mobilePhone}, ${u.streetAddress}, ${u.city}, ${u.state ?? null}, ${u.postalCode ?? null}, ${u.country},
-        ${u.managerEntraId}, ${tx.json(u.extensionAttrs)}, ${u.accountEnabled}, ${u.mailboxType}, now(), null)
+        ${tenantId}, ${u.entraObjectId}, ${u.email.toLowerCase()},
+        ${selected("proxyAddresses") ? u.aliases.map((a) => a.toLowerCase()) : []}::citext[],
+        ${selected("displayName") ? u.displayName : null},
+        ${selected("givenName") ? u.givenName : null},
+        ${selected("surname") ? u.surname : null},
+        ${selected("jobTitle") ? u.jobTitle : null},
+        ${selected("department") ? u.department : null},
+        ${selected("companyName") ? u.companyName : null},
+        ${selected("officeLocation") ? u.officeLocation : null},
+        ${selected("businessPhones") ? u.businessPhone : null},
+        ${selected("mobilePhone") ? u.mobilePhone : null},
+        ${selected("streetAddress") ? u.streetAddress : null},
+        ${selected("city") ? u.city : null},
+        ${selected("state") ? u.state ?? null : null},
+        ${selected("postalCode") ? u.postalCode ?? null : null},
+        ${selected("country") ? u.country : null},
+        ${projection ? null : u.managerEntraId}, ${tx.json(extensions)},
+        ${selected("accountEnabled") ? u.accountEnabled : true}, ${projection ? "user" : u.mailboxType}, now(), null)
       on conflict (tenant_id, entra_object_id) do update set
-        email = excluded.email, aliases = excluded.aliases, display_name = excluded.display_name,
-        given_name = excluded.given_name, surname = excluded.surname, job_title = excluded.job_title,
-        department = excluded.department, company_name = excluded.company_name, office_location = excluded.office_location,
-        business_phone = excluded.business_phone, mobile_phone = excluded.mobile_phone, street_address = excluded.street_address,
-        city = excluded.city, state = excluded.state, postal_code = excluded.postal_code, country = excluded.country, manager_entra_id = excluded.manager_entra_id,
-        extension_attrs = excluded.extension_attrs, account_enabled = excluded.account_enabled,
-        mailbox_type = excluded.mailbox_type, last_synced_at = now(), deleted_at = null`;
+        email = case when ${selected("mail")} then excluded.email else directory_users.email end,
+        aliases = case when ${selected("proxyAddresses")} then excluded.aliases else directory_users.aliases end,
+        display_name = case when ${selected("displayName")} then excluded.display_name else directory_users.display_name end,
+        given_name = case when ${selected("givenName")} then excluded.given_name else directory_users.given_name end,
+        surname = case when ${selected("surname")} then excluded.surname else directory_users.surname end,
+        job_title = case when ${selected("jobTitle")} then excluded.job_title else directory_users.job_title end,
+        department = case when ${selected("department")} then excluded.department else directory_users.department end,
+        company_name = case when ${selected("companyName")} then excluded.company_name else directory_users.company_name end,
+        office_location = case when ${selected("officeLocation")} then excluded.office_location else directory_users.office_location end,
+        business_phone = case when ${selected("businessPhones")} then excluded.business_phone else directory_users.business_phone end,
+        mobile_phone = case when ${selected("mobilePhone")} then excluded.mobile_phone else directory_users.mobile_phone end,
+        street_address = case when ${selected("streetAddress")} then excluded.street_address else directory_users.street_address end,
+        city = case when ${selected("city")} then excluded.city else directory_users.city end,
+        state = case when ${selected("state")} then excluded.state else directory_users.state end,
+        postal_code = case when ${selected("postalCode")} then excluded.postal_code else directory_users.postal_code end,
+        country = case when ${selected("country")} then excluded.country else directory_users.country end,
+        manager_entra_id = case when ${!projection} then excluded.manager_entra_id else directory_users.manager_entra_id end,
+        extension_attrs = case
+          when ${!projection} then excluded.extension_attrs
+          when ${keysToReplace.length === 0} then directory_users.extension_attrs
+          else coalesce((
+            select jsonb_object_agg(item.key, item.value)
+            from jsonb_each(directory_users.extension_attrs) as item(key, value)
+            where lower(item.key collate "C") <> all(${keysToReplace}::text[])
+          ), '{}'::jsonb) || excluded.extension_attrs
+        end,
+        account_enabled = case when ${selected("accountEnabled")} then excluded.account_enabled else directory_users.account_enabled end,
+        mailbox_type = case when ${!projection} then excluded.mailbox_type else directory_users.mailbox_type end,
+        last_synced_at = now(), deleted_at = null`;
     n++;
   }
   return n;
@@ -101,9 +163,11 @@ export async function upsertGroups(tx: Tx, tenantId: string, groups: DirectoryGr
   for (const g of groups) {
     await tx`
       insert into directory_groups (tenant_id, entra_object_id, display_name, mail, last_synced_at, deleted_at)
-      values (${tenantId}, ${g.entraObjectId}, ${g.displayName}, ${g.mail}, now(), null)
+      values (${tenantId}, ${g.entraObjectId}, ${g.displayName}, ${g.mail ?? null}, now(), null)
       on conflict (tenant_id, entra_object_id) do update set
-        display_name = excluded.display_name, mail = excluded.mail, last_synced_at = now(), deleted_at = null`;
+        display_name = excluded.display_name,
+        mail = case when ${g.mail !== undefined} then excluded.mail else directory_groups.mail end,
+        last_synced_at = now(), deleted_at = null`;
   }
 }
 
@@ -150,11 +214,29 @@ export interface SyncRunState {
   groupsDeltaLink: string | null;
 }
 
-export async function lastDeltaLinks(tx: Tx, tenantId: string): Promise<{ users: string | null; groups: string | null }> {
-  const [r] = await tx<{ users_delta_link: string | null; groups_delta_link: string | null }[]>`
-    select users_delta_link, groups_delta_link from sync_runs
+export async function lastDeltaLinks(tx: Tx, tenantId: string): Promise<{
+  users: string | null;
+  groups: string | null;
+  usersSelection: string | null;
+  groupsSelection: string | null;
+}> {
+  const [r] = await tx<{
+    users_delta_link: string | null;
+    groups_delta_link: string | null;
+    users_selection: string | null;
+    groups_selection: string | null;
+  }[]>`
+    select coalesce(users_projection_delta_link, users_delta_link) as users_delta_link,
+           coalesce(groups_projection_delta_link, groups_delta_link) as groups_delta_link,
+           users_selection, groups_selection
+    from sync_runs
     where tenant_id = ${tenantId} and status = 'succeeded' order by started_at desc limit 1`;
-  return { users: r?.users_delta_link ?? null, groups: r?.groups_delta_link ?? null };
+  return {
+    users: r?.users_delta_link ?? null,
+    groups: r?.groups_delta_link ?? null,
+    usersSelection: r?.users_selection ?? null,
+    groupsSelection: r?.groups_selection ?? null,
+  };
 }
 
 export async function startSyncRun(tx: Tx, tenantId: string, kind: "full" | "delta"): Promise<string> {
@@ -165,11 +247,25 @@ export async function startSyncRun(tx: Tx, tenantId: string, kind: "full" | "del
 export async function finishSyncRun(
   tx: Tx,
   runId: string,
-  result: { ok: true; usersDeltaLink: string; groupsDeltaLink: string; usersChanged: number } | { ok: false; error: string },
+  result: {
+    ok: true;
+    usersDeltaLink: string;
+    groupsDeltaLink: string;
+    usersSelection?: string | null;
+    groupsSelection?: string | null;
+    usersChanged: number;
+  } | { ok: false; error: string },
 ): Promise<void> {
   if (result.ok) {
-    await tx`update sync_runs set status = 'succeeded', finished_at = now(), users_delta_link = ${result.usersDeltaLink},
-             groups_delta_link = ${result.groupsDeltaLink}, users_changed = ${result.usersChanged} where id = ${runId}`;
+    const usersProjected = result.usersSelection != null;
+    const groupsProjected = result.groupsSelection != null;
+    await tx`update sync_runs set status = 'succeeded', finished_at = now(),
+             users_delta_link = ${usersProjected ? null : result.usersDeltaLink},
+             groups_delta_link = ${groupsProjected ? null : result.groupsDeltaLink},
+             users_projection_delta_link = ${usersProjected ? result.usersDeltaLink : null},
+             groups_projection_delta_link = ${groupsProjected ? result.groupsDeltaLink : null},
+             users_selection = ${result.usersSelection ?? null}, groups_selection = ${result.groupsSelection ?? null},
+             users_changed = ${result.usersChanged} where id = ${runId}`;
   } else {
     await tx`update sync_runs set status = 'failed', finished_at = now(), error = ${result.error.slice(0, 2000)} where id = ${runId}`;
   }

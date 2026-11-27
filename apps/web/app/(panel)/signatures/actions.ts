@@ -1,13 +1,13 @@
 "use server";
 import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
-import { render, type Element, type FieldValues, type Layout } from "@sing365/render";
+import { render, type FieldValues, type Layout } from "@sing365/render";
 import type { Mode, Rule } from "@sing365/rules";
 import { requirePanel } from "@/lib/context";
 import { data } from "@/lib/data";
 import { htmlLayout, htmlProblems } from "@/lib/html-template";
 import { addStarterTemplates } from "@/lib/starter";
-import { parseVisualLayout, simpleVisualRule } from "@/lib/visual-signature";
+import { hasSignatureContent, parseVisualLayout, simpleVisualRule } from "@/lib/visual-signature";
 
 /** Creates the starter signatures and opens the full one, previewed for the signed-in admin. */
 export async function addStarterTemplatesAction() {
@@ -34,9 +34,23 @@ export interface VisualFormState {
 
 function refreshSignatures(id: string) {
   revalidatePath("/signatures");
+  revalidatePath("/signatures/apply");
   revalidatePath(`/signatures/${id}`);
   revalidatePath(`/signatures/${id}/edit`);
   revalidatePath("/");
+}
+
+function applicationUrl(id: string, notice: string) {
+  const query = new URLSearchParams({ notice });
+  if (id) query.set("template", id);
+  return `/signatures/apply?${query}`;
+}
+
+function submittedVersion(form: FormData) {
+  const raw = form.get("version");
+  if (typeof raw !== "string" || !/^\d+$/.test(raw)) return null;
+  const version = Number(raw);
+  return Number.isSafeInteger(version) ? version : null;
 }
 
 function submittedLayout(form: FormData) {
@@ -68,76 +82,105 @@ export async function saveVisualTemplateAction(_prev: VisualFormState, form: For
   const parsed = submittedLayout(form);
   if (!parsed.layout) return { errors: parsed.errors };
   if (!name || name.length > 100) return { errors: ["İmza adı 1–100 karakter arasında olmalı."] };
-  const rules = id ? await data.listRules(tenantId) : [];
-  const rule = simpleVisualRule(rules.filter((entry) => entry.templateId === id));
-  const appliesTo = APPLIES.find((option) => option === form.get("appliesTo")) ?? "both";
-  const scope = RECIPIENTS.find((option) => option === form.get("recipientScope")) ?? "any";
-  const priority = Number(form.get("priority") ?? 50);
-  const senderGroup = String(form.get("senderGroup") ?? "");
-  if (!id || rule) {
-    if (priority !== rule?.priority && (!Number.isInteger(priority) || priority < 1 || priority > 999)) {
-      return { errors: ["Öncelik 1–999 arasında olmalı."] };
-    }
-    if (senderGroup && senderGroup !== rule?.senders.groups?.[0] && !(await data.listGroups(tenantId)).some((group) => group.id === senderGroup)) {
-      return { errors: ["Gönderen grubu bulunamadı."] };
-    }
-  }
-  const assignment = {
-    senders: senderGroup ? { groups: [senderGroup] } : { all: true },
-    recipients: { scope },
-    appliesTo,
-  };
-
-  let savedId = id;
   if (id) {
     const existing = await data.getTemplate(tenantId, id);
     if (existing?.kind !== "signature" || existing.status === "archived" || !parseVisualLayout(existing.layout).layout) {
       return { errors: ["Görsel imza bulunamadı veya artık düzenlenemiyor."] };
     }
     if (existing.status === "published" && !hasSignatureContent(parsed.layout)) return { errors: ["Yayındaki imzada en az bir içerik bloğu olmalı."] };
-    const version = Number(form.get("version"));
-    if (!Number.isSafeInteger(version) || version < 1) return { errors: ["İmzayı yeniden açıp değişikliklerinizi kaydedin."] };
-    const updated = await data.updateVisualTemplate(tenantId, id, {
-      name, layout: parsed.layout, version,
-      placement: rule ? { ruleId: rule.id, priority, ...assignment } : undefined,
-    });
+    const version = submittedVersion(form);
+    if (version === null) return { errors: ["İmzayı yeniden açıp değişikliklerinizi kaydedin."] };
+    const updated = await data.updateVisualTemplate(tenantId, id, { name, layout: parsed.layout, version });
     if (!updated) return { errors: ["Bu şablon başka bir oturumda değiştirildi. İmzayı yeniden açıp tekrar deneyin."] };
-  } else {
-    savedId = await data.createTemplateWithRule(tenantId, {
-      name, kind: "signature", status: "draft", layout: parsed.layout, priority, rule: assignment,
-    });
+    refreshSignatures(id);
+    redirect(`/signatures/${id}`);
   }
+
+  const savedId = await data.createTemplateWithRule(tenantId, {
+    name, kind: "signature", status: "draft", layout: parsed.layout, priority: 50,
+    rule: { senders: { all: true }, recipients: { scope: "any" }, appliesTo: "both" },
+  });
   refreshSignatures(savedId);
-  redirect(`/signatures/${savedId}`);
+  redirect(applicationUrl(savedId, "draft"));
 }
 
-function hasSignatureContent(layout: Layout): boolean {
-  function hasContent(element: Element): boolean {
-    if (element.type === "text") return Boolean(element.text.trim());
-    if (element.type === "image") return true;
-    if (element.type === "social") return element.links.length > 0;
-    return element.type === "columns" && element.columns.some((column) => column.elements.some(hasContent));
+export async function configureTemplateApplicationAction(form: FormData) {
+  const { tenantId } = await requirePanel();
+  const id = String(form.get("id") ?? "");
+  const [template, rules] = await Promise.all([data.getTemplate(tenantId, id), data.listRules(tenantId)]);
+  if (template?.kind !== "signature" || template.status === "archived") redirect(applicationUrl("", "invalid"));
+
+  const version = submittedVersion(form);
+  const templateRules = rules.filter((entry) => entry.templateId === id);
+  const rule = simpleVisualRule(templateRules);
+  if (templateRules.length && !rule) redirect(applicationUrl(id, "advanced"));
+
+  const appliesTo = APPLIES.find((option) => option === form.get("appliesTo"));
+  const scope = RECIPIENTS.find((option) => option === form.get("recipientScope"));
+  const priority = Number(form.get("priority"));
+  const senderGroup = String(form.get("senderGroup") ?? "");
+  const enabled = form.get("enabled") === "on";
+  const validPriority = priority === rule?.priority || (Number.isInteger(priority) && priority >= 1 && priority <= 999);
+  if (version === null || !appliesTo || !scope || !validPriority) redirect(applicationUrl(id, "invalid"));
+  if (senderGroup && senderGroup !== rule?.senders.groups?.[0] && !(await data.listGroups(tenantId)).some((group) => group.id === senderGroup)) {
+    redirect(applicationUrl(id, "group"));
   }
-  return layout.elements.some(hasContent);
+
+  const updated = await data.updateTemplateApplication(tenantId, id, {
+    ruleId: rule?.id, version, priority, appliesTo, enabled,
+    senders: senderGroup ? { groups: [senderGroup] } : { all: true },
+    recipients: { scope },
+  });
+  if (!updated) redirect(applicationUrl(id, "conflict"));
+  refreshSignatures(id);
+  redirect(applicationUrl(id, "saved"));
 }
 
 export async function changeVisualTemplateStatusAction(form: FormData) {
   const { tenantId } = await requirePanel();
   const id = String(form.get("id") ?? "");
   const status = form.get("status");
-  const version = Number(form.get("version"));
-  if ((status !== "draft" && status !== "published") || !Number.isSafeInteger(version) || version < 1) redirect("/signatures");
+  const version = submittedVersion(form);
+  if ((status !== "draft" && status !== "published") || version === null) redirect(applicationUrl(id, "invalid"));
   const template = await data.getTemplate(tenantId, id);
-  const parsed = parseVisualLayout(template?.layout);
-  if (template?.kind !== "signature" || !parsed.layout) redirect("/signatures");
-  const url = `/signatures/${template.id}`;
+  if (template?.kind !== "signature" || template.status === "archived") redirect(applicationUrl("", "invalid"));
   if (status === "published") {
-    if (!hasSignatureContent(parsed.layout)) redirect(`${url}?notice=empty`);
-    if (!(await data.listRules(tenantId)).some((rule) => rule.templateId === id && rule.enabled)) redirect(`${url}?notice=rule`);
+    if (!hasSignatureContent(template.layout)) redirect(applicationUrl(id, "empty"));
+    if (!(await data.listRules(tenantId)).some((rule) => rule.templateId === id && rule.enabled)) redirect(applicationUrl(id, "rule"));
   }
-  if (!(await data.setVisualTemplateStatus(tenantId, id, version, status))) redirect(`${url}?notice=conflict`);
+  const previous = status === "draft" ? "published" : "draft";
+  if (!(await data.setVisualTemplateStatus(tenantId, id, version, status, previous))) redirect(applicationUrl(id, "conflict"));
   refreshSignatures(id);
-  redirect(url);
+  redirect(applicationUrl(id, status === "published" ? "published" : "unpublished"));
+}
+
+export async function changeTemplateArchiveAction(form: FormData) {
+  const { tenantId } = await requirePanel();
+  const id = String(form.get("id") ?? "");
+  const status = form.get("status");
+  const version = submittedVersion(form);
+  if (version === null || (status !== "archived" && status !== "draft")) redirect("/signatures?notice=conflict");
+
+  const template = await data.getTemplate(tenantId, id);
+  if (template?.kind !== "signature" || (status === "archived") === (template.status === "archived")) {
+    redirect("/signatures?notice=conflict");
+  }
+  if (!(await data.setVisualTemplateStatus(tenantId, id, version, status, template.status))) redirect("/signatures?notice=conflict");
+  refreshSignatures(id);
+  redirect(status === "archived" ? "/signatures?status=archived&notice=archived" : "/signatures?status=draft&notice=restored");
+}
+
+export async function deleteArchivedSignatureAction(form: FormData) {
+  const { tenantId } = await requirePanel();
+  const id = String(form.get("id") ?? "");
+  const version = submittedVersion(form);
+  const template = await data.getTemplate(tenantId, id);
+  if (version === null || template?.status !== "archived" || template.kind !== "signature" || form.get("confirm") !== "yes") {
+    redirect("/signatures?status=archived&notice=delete-blocked");
+  }
+  if (!(await data.deleteArchivedTemplate(tenantId, id, version))) redirect("/signatures?status=archived&notice=delete-blocked");
+  refreshSignatures(id);
+  redirect("/signatures?status=archived&notice=deleted");
 }
 
 export async function duplicateVisualTemplateAction(form: FormData) {
