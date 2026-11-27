@@ -1,0 +1,10 @@
+@import "tailwindcss";
+/* Design tokens are generated in replica/design/tokens.css (source: tokens.json). */
+@import "../../../replica/design/tokens.css";
+
+@layer base {
+  html { font-family: var(--s365-font-sans); color: var(--s365-color-text); background: var(--s365-color-bg); }
+  body { font-size: 0.875rem; line-height: 1.25rem; }
+  :focus-visible { outline: 2px solid var(--s365-color-focus); outline-offset: 2px; }
+  @media (prefers-reduced-motion: reduce) { * { transition: none !important; animation: none !important; } }
+}
