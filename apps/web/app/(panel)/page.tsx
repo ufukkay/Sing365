@@ -10,9 +10,9 @@ const fmt = (iso: string | null) =>
 
 export default async function Dashboard() {
   const { tenantId } = await requirePanel();
-  const [tenant, users, templates, sync] = await Promise.all([
+  const [tenant, counts, templates, sync] = await Promise.all([
     data.getTenant(tenantId),
-    data.listUsers(tenantId),
+    data.countUsers(tenantId),
     data.listTemplates(tenantId),
     data.getSyncStatus(tenantId),
   ]);
@@ -23,7 +23,7 @@ export default async function Dashboard() {
     <>
       <PageHeader title="Genel bakış" description="İmzaların durumu, dizin senkronu ve dağıtım tek bakışta." />
       <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
-        <StatTile label="Aktif posta kutusu" value={users.filter((u) => u.accountEnabled).length} note="faturalanan kişi sayısı" />
+        <StatTile label="Aktif posta kutusu" value={counts.enabled.toLocaleString("tr-TR")} note="faturalanan kişi sayısı" />
         <StatTile label="Yayındaki imza" value={published} note={`${templates.length - published} taslak`} />
         <StatTile label="Son senkron" value={<span className="text-base">{fmt(sync.finishedAt)}</span>} note={`${sync.usersChanged} kişi güncellendi`} />
         <StatTile label="Dağıtım" value={<span className="text-base">{mode}</span>} note={<Badge tone="accent">aktif</Badge>} />

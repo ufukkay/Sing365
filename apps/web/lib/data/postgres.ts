@@ -92,11 +92,34 @@ export function postgresData(db: Db): DataLayer {
       const [r] = await db.sql<TenantRow[]>`select id, entra_tenant_id, name, domains, deployment_mode, consent_status from tenants where entra_tenant_id = ${tid}`;
       return r ? toTenant(r) : null;
     },
-    async listUsers(tenantId) {
+    async listUsers(tenantId, opts = {}) {
+      const limit = Math.max(1, Math.min(5000, opts.limit ?? 500));
+      const q = opts.q?.trim() ? `%${opts.q.trim().replace(/[\\%_]/g, (c) => `\\${c}`)}%` : null;
       const rows = await db.forTenant(tenantId, (tx) =>
-        tx.unsafe<UserRow[]>(`select ${USER_SELECT} from directory_users u where u.deleted_at is null order by u.display_name limit 500`),
+        tx.unsafe<UserRow[]>(
+          `select ${USER_SELECT} from directory_users u where u.deleted_at is null
+           and ($1::text is null or u.display_name ilike $1 or u.email::text ilike $1)
+           order by u.display_name limit $2`,
+          [q, limit],
+        ),
       );
       return rows.map(toUser);
+    },
+    async countUsers(tenantId) {
+      const [r] = await db.forTenant(tenantId, (tx) =>
+        tx<{ total: number; enabled: number }[]>`
+          select count(*)::int as total, count(*) filter (where account_enabled)::int as enabled
+          from directory_users where deleted_at is null`,
+      );
+      return { total: r?.total ?? 0, enabled: r?.enabled ?? 0 };
+    },
+    async listPeople(tenantId) {
+      const rows = await db.forTenant(tenantId, (tx) =>
+        tx<{ id: string; email: string; display_name: string }[]>`
+          select id, email, display_name from directory_users
+          where deleted_at is null and account_enabled order by display_name limit 5000`,
+      );
+      return rows.map((r) => ({ id: r.id, email: r.email, displayName: r.display_name }));
     },
     async getUser(tenantId, userId) {
       const rows = await db.forTenant(tenantId, (tx) =>

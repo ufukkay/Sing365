@@ -24,7 +24,7 @@ export default async function SignaturePreview({
   searchParams,
 }: {
   params: Promise<{ id: string }>;
-  searchParams: Promise<{ user?: string; mode?: string; to?: string }>;
+  searchParams: Promise<{ user?: string; email?: string; mode?: string; to?: string }>;
 }) {
   const { tenantId, session } = await requirePanel();
   const { id } = await params;
@@ -32,10 +32,16 @@ export default async function SignaturePreview({
   const template = await data.getTemplate(tenantId, id);
   if (!template) notFound();
 
-  const users = await data.listUsers(tenantId);
-  // Default to the signed-in admin's own directory entry, so they see their own signature first.
-  const me = !sp.user && session ? await data.findUserByEmail(tenantId, session.email) : null;
-  const user = (sp.user ? users.find((u) => u.id === sp.user) : me) ?? users[0];
+  const people = await data.listPeople(tenantId);
+  // An address typed in the form, else a person picked by id (links), else the signed-in admin, else the first person.
+  const asked = sp.email?.trim() ?? "";
+  const pickUser = async () => {
+    if (asked) return data.findUserByEmail(tenantId, asked);
+    if (sp.user) return data.getUser(tenantId, sp.user);
+    const me = session ? await data.findUserByEmail(tenantId, session.email) : null;
+    return me ?? (people[0] ? data.getUser(tenantId, people[0].id) : null);
+  };
+  const user = await pickUser();
   const mode = sp.mode === "reply" ? "reply" : "new";
   const to = sp.to ?? "musteri@baskafirma.com";
 
@@ -73,12 +79,28 @@ export default async function SignaturePreview({
         <Card title="Önizleme ayarları">
           <form className="flex flex-col gap-4" method="get">
             <div className="flex flex-col gap-1">
-              <label htmlFor="user" className="text-sm font-medium">Kişi</label>
-              <select id="user" name="user" defaultValue={user?.id} className="h-9 rounded-md border border-border-input bg-bg px-2 text-sm">
-                {users.map((u) => (
-                  <option key={u.id} value={u.id}>{u.displayName}</option>
+              <label htmlFor="email" className="text-sm font-medium">Kişi</label>
+              <input
+                id="email"
+                name="email"
+                type="text"
+                list="people"
+                autoComplete="off"
+                defaultValue={user?.email ?? asked}
+                placeholder="Ad veya e-posta yazın"
+                aria-describedby="email-hint"
+                className="h-9 rounded-md border border-border-input bg-bg px-3 text-sm"
+              />
+              <datalist id="people">
+                {people.map((p) => (
+                  <option key={p.id} value={p.email} label={p.displayName} />
                 ))}
-              </select>
+              </datalist>
+              {user ? (
+                <p id="email-hint" className="text-xs text-text-muted">{user.displayName}</p>
+              ) : (
+                <p id="email-hint" role="alert" className="text-xs text-danger">Bu adreste bir kişi bulunamadı.</p>
+              )}
             </div>
             <fieldset className="flex flex-col gap-1">
               <legend className="mb-1 text-sm font-medium">Mesaj türü</legend>
@@ -99,6 +121,7 @@ export default async function SignaturePreview({
             title="Bu imza"
             actions={template.status === "published" ? <Badge tone="success">Yayında · v{template.version}</Badge> : <Badge>Taslak</Badge>}
           >
+            {!user && <p className="text-sm text-text-muted">Önizleme için soldan bir kişi seçin.</p>}
             {preview && (
               <>
                 <iframe
@@ -134,7 +157,7 @@ export default async function SignaturePreview({
                 </ol>
               </>
             ) : (
-              <p className="text-sm text-text-muted">Bu kişi için imza bulunamadı.</p>
+              <p className="text-sm text-text-muted">{user ? "Bu kişi için imza bulunamadı." : "Önce bir kişi seçin."}</p>
             )}
           </Card>
         </div>

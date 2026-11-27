@@ -79,10 +79,20 @@ export interface NewTemplate {
   rule: Pick<Rule, "senders" | "recipients" | "appliesTo"> & Partial<Pick<Rule, "exceptions" | "enabled">>;
 }
 
+export interface PersonRef {
+  id: string;
+  email: string;
+  displayName: string;
+}
+
 export interface DataLayer {
   getTenant(tenantId: string): Promise<Tenant | null>;
   getTenantByEntraId(entraTenantId: string): Promise<Tenant | null>;
-  listUsers(tenantId: string): Promise<DirectoryUser[]>;
+  /** People by display name; `q` searches name and address. At most `limit` (default 500). */
+  listUsers(tenantId: string, opts?: { q?: string; limit?: number }): Promise<DirectoryUser[]>;
+  countUsers(tenantId: string): Promise<{ total: number; enabled: number }>;
+  /** Name and address of every enabled person (up to 5,000), for pickers. */
+  listPeople(tenantId: string): Promise<PersonRef[]>;
   getUser(tenantId: string, userId: string): Promise<DirectoryUser | null>;
   /** Matches the primary address or any alias, case-insensitively. */
   findUserByEmail(tenantId: string, email: string): Promise<DirectoryUser | null>;
