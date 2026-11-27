@@ -1,6 +1,7 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import { render } from "@sing365/render";
+import { CopySignature } from "@/components/copy-signature";
 import { Badge, Button, Card, PageHeader } from "@/components/ui";
 import { data } from "@/lib/data";
 import { requirePanel } from "@/lib/context";
@@ -130,6 +131,7 @@ export default async function SignaturePreview({
                   sandbox=""
                   className="h-64 w-full rounded-md border border-border bg-white"
                 />
+                <CopySignature html={preview.html} text={preview.text} />
                 {preview.missing.length > 0 && (
                   <p className="mt-3 text-xs text-text-muted">
                     {isHtml ? "Bu kişide boş olan alanlar" : "Bu kişide boş olan alanlar (satırları gizlendi)"}:{" "}
