@@ -38,8 +38,10 @@ if [ ! -f .env ]; then
   [ -n "$host" ] || read -rp "Panelin adresi (örn. app.alanadi.com): " host </dev/tty
   [ -n "$relay_host" ] || read -rp "Posta rölesinin adresi (örn. relay.alanadi.com): " relay_host </dev/tty
   [ -n "$client_id" ] || read -rp "Entra uygulama (client) kimliği: " client_id </dev/tty
-  read -rsp "Entra istemci gizli anahtarı (yazdıklarınız ekranda görünmez, bitince Enter): " client_secret </dev/tty
+  read -rsp "Entra istemci gizli anahtarı (sağ tık > Yapıştır; ekranda görünmez, bitince Enter): " client_secret </dev/tty
   echo
+  # A web terminal can slip control characters into a paste (Ctrl+V); Entra secrets use only these characters.
+  client_secret="$(printf %s "$client_secret" | tr -cd 'A-Za-z0-9._~-')"
   gen() { openssl rand -hex 32; }
   umask 077
   cat > .env <<ENV
@@ -62,8 +64,10 @@ if command -v ufw >/dev/null && ufw status | grep -q "Status: active"; then
 fi
 
 say "Uygulama derleniyor ve başlatılıyor (ilk seferde 5-10 dakika sürebilir)..."
-docker compose up -d --build --remove-orphans
-docker image prune -f >/dev/null
+# Runs on its own, so closing the terminal does not stop it; this window only shows its progress.
+log="$DIR/deploy/install.log"
+setsid nohup bash -c 'docker compose up -d --build --remove-orphans && docker image prune -f >/dev/null' >"$log" 2>&1 </dev/null &
+tail --pid=$! -n +1 -f "$log" || true
 
 host="$(grep '^SIGWIDE_HOST=' .env | cut -d"'" -f2)"
 say "Hazır: https://$host"
