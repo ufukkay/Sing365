@@ -88,6 +88,10 @@ export interface PersonRef {
 export interface DataLayer {
   getTenant(tenantId: string): Promise<Tenant | null>;
   getTenantByEntraId(entraTenantId: string): Promise<Tenant | null>;
+  /** The tenant whose Exchange rule stamps this relay key (stored only as a SHA-256 hash). */
+  getTenantByRelayKey(key: string): Promise<Tenant | null>;
+  /** Makes a new relay key for the tenant, replacing any earlier one, and returns it (shown once). */
+  createRelayKey(tenantId: string): Promise<string>;
   /** People by display name; `q` searches name and address. At most `limit` (default 500). */
   listUsers(tenantId: string, opts?: { q?: string; limit?: number }): Promise<DirectoryUser[]>;
   countUsers(tenantId: string): Promise<{ total: number; enabled: number }>;

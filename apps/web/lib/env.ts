@@ -8,6 +8,8 @@ export const env = {
   entraApiAudience: process.env.ENTRA_API_AUDIENCE ?? "",
   sessionSecret: process.env.SESSION_SECRET ?? "",
   cronSecret: process.env.CRON_SECRET ?? "",
+  /** Shared secret the Sing365 mail relay sends to /api/relay/sign (server-side signatures). */
+  relaySecret: process.env.RELAY_SECRET ?? "",
   devAuth: process.env.SING365_DEV_AUTH === "1" && process.env.NODE_ENV !== "production",
 };
 
