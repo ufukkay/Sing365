@@ -1,0 +1,10 @@
+{
+  "name": "@sing365/addin",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "build": "node scripts/build-manifest.mjs",
+    "test": "node scripts/build-manifest.mjs --check"
+  }
+}
