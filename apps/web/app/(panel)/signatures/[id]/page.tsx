@@ -42,6 +42,9 @@ export default async function SignaturePreview({
     : null;
   const templates = await data.listTemplates(tenantId);
   const nameOf = (tid: string | null) => templates.find((t) => t.id === tid)?.name ?? "imza yok";
+  const groups = await data.listGroups(tenantId);
+  /** The rules engine reports group ids; show the directory names instead. */
+  const readable = (detail: string) => groups.reduce((s, g) => s.split(g.id).join(`"${g.displayName}"`), detail);
 
   return (
     <>
@@ -112,7 +115,7 @@ export default async function SignaturePreview({
                     <li key={t.ruleId} className="flex flex-wrap items-center gap-2">
                       <Badge tone={t.outcome === "matched" ? "success" : "neutral"}>{outcomeText[t.outcome]}</Badge>
                       <span>{nameOf(t.templateId)}</span>
-                      <span className="text-text-muted">· {t.detail}</span>
+                      <span className="text-text-muted">· {readable(t.detail)}</span>
                     </li>
                   ))}
                 </ol>

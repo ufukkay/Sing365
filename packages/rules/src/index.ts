@@ -125,14 +125,14 @@ function attrMatches(c: AttrCondition, sender: Sender): boolean {
 /** Returns a human-readable reason when the sender matches, or null. */
 export function senderMatches(cond: SenderCondition | undefined, sender: Sender): string | null {
   if (!cond) return null;
-  if (cond.all) return "everyone";
-  if (cond.users?.includes(sender.id)) return "listed user";
+  if (cond.all) return "herkes";
+  if (cond.users?.includes(sender.id)) return "listedeki kişi";
   const group = cond.groups?.find((g) => sender.groupIds.includes(g));
-  if (group) return `member of group ${group}`;
+  if (group) return `${group} grubunun üyesi`;
   const dept = norm(sender.department);
-  if (dept && cond.departments?.some((d) => norm(d) === dept)) return `department ${sender.department}`;
+  if (dept && cond.departments?.some((d) => norm(d) === dept)) return `${sender.department} departmanı`;
   const attr = cond.attr?.find((a) => attrMatches(a, sender));
-  if (attr) return `attribute ${attr.key} ${attr.op}${attr.value ? ` ${attr.value}` : ""}`;
+  if (attr) return `${attr.key} özelliği ${attr.op}${attr.value ? ` ${attr.value}` : ""}`;
   return null;
 }
 
@@ -150,15 +150,15 @@ export function recipientsMatch(
   switch (cond.scope) {
     case "any":
       scopeOk = true;
-      detail = "any recipients";
+      detail = "tüm alıcılar";
       break;
     case "internal":
       scopeOk = domains.length > 0 && externalCount === 0;
-      detail = domains.length === 0 ? "no recipients yet, internal rules wait" : `${externalCount} external recipient(s)`;
+      detail = domains.length === 0 ? "henüz alıcı yok, iç kurallar bekler" : `${externalCount} dış alıcı`;
       break;
     case "external":
       scopeOk = domains.length === 0 || externalCount > 0;
-      detail = domains.length === 0 ? "no recipients yet, treated as external" : `${externalCount} external recipient(s)`;
+      detail = domains.length === 0 ? "henüz alıcı yok, dış kabul edilir" : `${externalCount} dış alıcı`;
       break;
   }
   if (!scopeOk) return { ok: false, detail };
@@ -166,8 +166,8 @@ export function recipientsMatch(
   if (cond.domains && cond.domains.length > 0) {
     const wanted = new Set(cond.domains.map(norm));
     const hit = domains.find((d) => wanted.has(d));
-    if (!hit) return { ok: false, detail: `no recipient on ${[...wanted].join(", ")}` };
-    return { ok: true, detail: `recipient on ${hit}` };
+    if (!hit) return { ok: false, detail: `${[...wanted].join(", ")} alan adında alıcı yok` };
+    return { ok: true, detail: `${hit} alan adında alıcı var` };
   }
   return { ok: true, detail };
 }
@@ -182,27 +182,27 @@ export function resolve(rules: Rule[], ctx: ResolveContext): Resolution {
   for (const rule of sortRules(rules)) {
     const base = { ruleId: rule.id, templateId: rule.templateId };
     if (!rule.enabled) {
-      trace.push({ ...base, outcome: "disabled", detail: "rule is turned off" });
+      trace.push({ ...base, outcome: "disabled", detail: "kural kapalı" });
       continue;
     }
     const from = toDate(rule.activeFrom);
     const until = toDate(rule.activeUntil);
     if ((from && ctx.now < from) || (until && ctx.now >= until)) {
-      trace.push({ ...base, outcome: "not_active", detail: "outside the rule's active dates" });
+      trace.push({ ...base, outcome: "not_active", detail: "kuralın geçerlilik tarihleri dışında" });
       continue;
     }
     if (rule.appliesTo !== "both" && rule.appliesTo !== ctx.mode) {
-      trace.push({ ...base, outcome: "wrong_mode", detail: `rule is for ${rule.appliesTo} messages` });
+      trace.push({ ...base, outcome: "wrong_mode", detail: `kural yalnızca ${rule.appliesTo === "reply" ? "yanıt/iletme" : "yeni"} mesajlar için` });
       continue;
     }
     const why = senderMatches(rule.senders, ctx.sender);
     if (!why) {
-      trace.push({ ...base, outcome: "sender_not_targeted", detail: "sender is not in this rule" });
+      trace.push({ ...base, outcome: "sender_not_targeted", detail: "gönderen bu kuralda yok" });
       continue;
     }
     const except = senderMatches(rule.exceptions, ctx.sender);
     if (except) {
-      trace.push({ ...base, outcome: "sender_excepted", detail: `excluded: ${except}` });
+      trace.push({ ...base, outcome: "sender_excepted", detail: `hariç tutuldu: ${except}` });
       continue;
     }
     const rec = recipientsMatch(rule.recipients, ctx.recipients, ctx.internalDomains);
