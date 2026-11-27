@@ -21,7 +21,7 @@ describe("POST /api/relay/sign", () => {
   });
 
   it("refuses an unknown key", async () => {
-    expect((await call({ key: "s365_nope", from: "ayse.yilmaz@example.com" })).status).toBe(403);
+    expect((await call({ key: "sgw_nope", from: "ayse.yilmaz@example.com" })).status).toBe(403);
     expect((await call({ from: "ayse.yilmaz@example.com" })).status).toBe(403);
   });
 

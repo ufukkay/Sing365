@@ -1,5 +1,5 @@
 /**
- * Sing365 signature renderer.
+ * Sigwide signature renderer.
  *
  * Turns a designer layout (the `templates.layout` JSON) plus one person's data
  * into email-safe HTML and a plain-text twin. Rules (replica/design/components.md §5):
@@ -324,7 +324,7 @@ export function render(layout: Layout, values: FieldValues): RenderResult {
   const text: string[] = [];
   const inner = renderList(ctx, layout.elements, text) ?? "";
   const maxWidth = layout.maxWidth ?? 600;
-  const html = `<table role="presentation" cellpadding="0" cellspacing="0" border="0" style="max-width:${maxWidth}px;border-collapse:collapse" data-sing365="1"><tr><td style="padding:0">${inner}</td></tr></table>`;
+  const html = `<table role="presentation" cellpadding="0" cellspacing="0" border="0" style="max-width:${maxWidth}px;border-collapse:collapse" data-sigwide="1"><tr><td style="padding:0">${inner}</td></tr></table>`;
   return {
     html,
     text: text.join("\n"),

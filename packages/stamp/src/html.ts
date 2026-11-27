@@ -48,7 +48,7 @@ function endOfDiv(html: string, start: number): number {
 }
 
 export function insertHtmlSignature(html: string, signature: string, reply: boolean): { html: string; placement: Placement } {
-  const block = `<div class="sing365-signature" style="margin:12px 0">${signature}</div>`;
+  const block = `<div class="sigwide-signature" style="margin:12px 0">${signature}</div>`;
   const quote = replyMarker(html);
 
   const mobile = MOBILE_SIGNATURE.exec(html);

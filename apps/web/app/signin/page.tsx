@@ -7,7 +7,7 @@ const errors: Record<string, string> = {
   denied: "Giriş iptal edildi.",
   state: "Oturum süresi doldu, lütfen tekrar deneyin.",
   token: "Microsoft'tan gelen yanıt doğrulanamadı.",
-  not_admin: "Bu kuruluşta Sing365 yöneticisi değilsiniz. Kuruluşunuzdaki Sing365 sahibinden sizi eklemesini isteyin.",
+  not_admin: "Bu kuruluşta Sigwide yöneticisi değilsiniz. Kuruluşunuzdaki Sigwide sahibinden sizi eklemesini isteyin.",
 };
 
 export default async function SignIn({ searchParams }: { searchParams: Promise<{ error?: string }> }) {
@@ -15,7 +15,7 @@ export default async function SignIn({ searchParams }: { searchParams: Promise<{
   return (
     <main className="flex min-h-screen items-center justify-center bg-surface px-4">
       <Card className="w-full max-w-md">
-        <h1 className="text-2xl font-bold text-accent">Sing365</h1>
+        <h1 className="text-2xl font-bold text-accent">Sigwide</h1>
         <p className="mt-2 text-sm text-text-muted">Microsoft 365 iş hesabınızla giriş yapın.</p>
         {error && (
           <p role="alert" className="mt-4 rounded-md bg-danger-subtle px-3 py-2 text-sm text-danger">

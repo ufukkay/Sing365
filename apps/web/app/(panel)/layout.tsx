@@ -16,7 +16,7 @@ export default async function PanelLayout({ children }: { children: React.ReactN
         <a href="#main" className="sr-only focus:not-sr-only">
           İçeriğe geç
         </a>
-        <span className="text-lg font-bold text-accent">Sing365</span>
+        <span className="text-lg font-bold text-accent">Sigwide</span>
         <span className="truncate text-sm text-text-muted">{tenant?.name}</span>
         <span className="ml-auto flex items-center gap-2">
           {session && (

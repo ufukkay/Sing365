@@ -16,7 +16,7 @@ function relayAuthorized(req: Request): boolean {
 }
 
 /**
- * POST /api/relay/sign — called by the Sing365 mail relay for each message Exchange routes to it.
+ * POST /api/relay/sign — called by the Sigwide mail relay for each message Exchange routes to it.
  * Body: { key, from, recipients, mode, skip }. The key (stamped by the customer's Exchange rule)
  * identifies the tenant. Answers with the signature for the sender (null if none or if the message
  * must not be changed) and the tenant domain whose Exchange Online endpoint the message goes back to.

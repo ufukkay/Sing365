@@ -1,5 +1,5 @@
 /**
- * Sing365 rule engine.
+ * Sigwide rule engine.
  *
  * One pure function decides which template a sender gets. The add-in API, the
  * rules tester and the server-side relay all call it, so they never disagree.

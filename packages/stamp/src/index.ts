@@ -14,10 +14,10 @@ import { insertTextSignature } from "./text";
 export { insertHtmlSignature, replyMarker } from "./html";
 export { insertTextSignature } from "./text";
 
-/** Header Sing365 puts on every message it has handled; the Exchange rule skips messages that carry it. */
-export const SIGNED_HEADER = "X-Sing365-Signed";
+/** Header Sigwide puts on every message it has handled; the Exchange rule skips messages that carry it. */
+export const SIGNED_HEADER = "X-Sigwide-Signed";
 /** Header the customer's Exchange rule sets with the tenant's relay key; removed before the message leaves. */
-export const KEY_HEADER = "X-Sing365-Key";
+export const KEY_HEADER = "X-Sigwide-Key";
 
 export type Mode = "new" | "reply";
 
@@ -26,7 +26,7 @@ export interface MessageInfo {
   from: string;
   mode: Mode;
   subject: string;
-  /** Value of the X-Sing365-Key header, if any. */
+  /** Value of the X-Sigwide-Key header, if any. */
   key: string | null;
   /** Why this message must not be changed, or null. */
   skip: SkipReason | null;
@@ -146,14 +146,14 @@ function mark(items: SplitItem[], value: string): void {
   root.headers.add(SIGNED_HEADER, value);
 }
 
-/** Reads what Sing365 needs to pick a signature, without changing anything. */
+/** Reads what Sigwide needs to pick a signature, without changing anything. */
 export async function inspectMessage(raw: Buffer): Promise<MessageInfo> {
   return describe(await split(raw)).info;
 }
 
 /**
  * Adds the signature `getSignature` returns to `raw`. Every message that comes back carries
- * the X-Sing365-Signed header (so the Exchange rule does not send it round again) and has the
+ * the X-Sigwide-Signed header (so the Exchange rule does not send it round again) and has the
  * key header removed. A message that must not be changed comes back otherwise as it was.
  */
 export async function stampMessage(raw: Buffer, getSignature: (info: MessageInfo) => Promise<Signature | null>): Promise<StampResult> {

@@ -9,7 +9,7 @@ export interface Session {
   oid: string; // Entra object id of the person
   email: string;
   name: string;
-  tenantId?: string; // Sing365 tenant id once the organisation has consented
+  tenantId?: string; // Sigwide tenant id once the organisation has consented
 }
 
 const COOKIE = "s365_session";

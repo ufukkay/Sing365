@@ -5,7 +5,7 @@ import { describe, expect, it } from "vitest";
 import { inspectMessage, insertHtmlSignature, insertTextSignature, stampMessage, type Signature } from "../src/index";
 
 const SIG: Signature = {
-  html: '<table data-sing365="1"><tr><td><b>Ufuk KAYA</b> | Kıdemli Uzman</td></tr></table>',
+  html: '<table data-sigwide="1"><tr><td><b>Ufuk KAYA</b> | Kıdemli Uzman</td></tr></table>',
   text: "Ufuk KAYA\nKıdemli Uzman",
 };
 const sign = async () => SIG;
@@ -45,7 +45,7 @@ describe("HTML placement", () => {
   it("goes before </body> in a new message", () => {
     const r = insertHtmlSignature("<html><body><p>Merhaba</p></body></html>", "SIG", false);
     expect(r.placement).toBe("end");
-    expect(r.html).toMatch(/<p>Merhaba<\/p><div class="sing365-signature"[^>]*>SIG<\/div><\/body>/);
+    expect(r.html).toMatch(/<p>Merhaba<\/p><div class="sigwide-signature"[^>]*>SIG<\/div><\/body>/);
   });
 
   it("goes above the quoted message in replies from Outlook on the web", () => {
@@ -80,7 +80,7 @@ describe("HTML placement", () => {
   });
 
   it("falls back to the end of a reply with no recognisable quote", () => {
-    expect(insertHtmlSignature("<p>Tamam</p>", "SIG", true)).toEqual({ html: '<p>Tamam</p><div class="sing365-signature" style="margin:12px 0">SIG</div>', placement: "end" });
+    expect(insertHtmlSignature("<p>Tamam</p>", "SIG", true)).toEqual({ html: '<p>Tamam</p><div class="sigwide-signature" style="margin:12px 0">SIG</div>', placement: "end" });
   });
 });
 
@@ -107,7 +107,7 @@ describe("text placement", () => {
 describe("stampMessage", () => {
   it("signs a new message from Outlook on the web: HTML and text, UTF-8, marked and key removed", async () => {
     const raw = alternative(
-      [...FROM, "Subject: Teklif", "X-Sing365-Key: secret-key"],
+      [...FROM, "Subject: Teklif", "X-Sigwide-Key: secret-key"],
       "Merhaba,\r\nTeklif ektedir.\r\n",
       '<html><head><meta charset="utf-8"></head><body><div style="font-family:Calibri">Merhaba,<br>Teklif ektedir.</div></body></html>',
     );
@@ -119,9 +119,9 @@ describe("stampMessage", () => {
     expect(seen).toEqual([{ from: "ufuk.kaya@talay.com", mode: "new", subject: "Teklif", key: "secret-key", skip: null }]);
     expect(r.status).toBe("signed");
     const m = await simpleParser(r.raw);
-    expect(m.headers.get("x-sing365-signed")).toBe("1");
-    expect(m.headers.has("x-sing365-key")).toBe(false);
-    expect(m.html).toContain("Teklif ektedir.</div><div class=\"sing365-signature\"");
+    expect(m.headers.get("x-sigwide-signed")).toBe("1");
+    expect(m.headers.has("x-sigwide-key")).toBe(false);
+    expect(m.html).toContain("Teklif ektedir.</div><div class=\"sigwide-signature\"");
     expect(m.html).toContain("Kıdemli Uzman");
     expect(m.text).toBe("Merhaba,\nTeklif ektedir.\n\nUfuk KAYA\nKıdemli Uzman\n");
     expect(m.subject).toBe("Teklif");
@@ -137,7 +137,7 @@ describe("stampMessage", () => {
     expect(info.mode).toBe("reply");
     expect(info.subject).toBe("YNT: Fiyat güncellemesi");
     const m = await simpleParser((await stampMessage(raw, sign)).raw);
-    expect(String(m.html).indexOf("sing365-signature")).toBeLessThan(String(m.html).indexOf("appendonsend"));
+    expect(String(m.html).indexOf("sigwide-signature")).toBeLessThan(String(m.html).indexOf("appendonsend"));
     expect(m.text).toContain("Tamam.\n\nUfuk KAYA\nKıdemli Uzman\n\n____");
   });
 
@@ -151,7 +151,7 @@ describe("stampMessage", () => {
     );
     const r = await stampMessage(raw, sign);
     const m = await simpleParser(r.raw);
-    expect(m.html).toContain("Teşekkürler, görüşmek üzere.</p><div><div class=\"sing365-signature\"");
+    expect(m.html).toContain("Teşekkürler, görüşmek üzere.</p><div><div class=\"sigwide-signature\"");
     expect(String(m.html).indexOf("Kıdemli")).toBeLessThan(String(m.html).indexOf("From:"));
     expect(r.raw.toString("binary")).toMatch(/charset=utf-8/i);
   });
@@ -205,11 +205,11 @@ describe("stampMessage", () => {
     );
     const r = await stampMessage(raw, sign);
     const m = await simpleParser(r.raw);
-    expect(m.html).toContain("<p>Ekte.</p><div class=\"sing365-signature\"");
+    expect(m.html).toContain("<p>Ekte.</p><div class=\"sigwide-signature\"");
     const att = m.attachments.find((a) => a.filename === "fatura.pdf");
     expect(createHash("sha256").update(att!.content).digest("hex")).toBe(createHash("sha256").update(pdf).digest("hex"));
     expect(r.raw.toString("binary")).toContain("<html><body><p>ic mesaj</p></body></html>");
-    expect(r.raw.toString("binary").match(/sing365-signature/g)).toHaveLength(1);
+    expect(r.raw.toString("binary").match(/sigwide-signature/g)).toHaveLength(1);
   });
 
   it("does not touch S/MIME, meeting invites or auto-replies, but still marks them", async () => {
@@ -224,24 +224,24 @@ describe("stampMessage", () => {
       });
       expect(r).toMatchObject({ status: "skipped", reason });
       expect(asked).toBe(false);
-      expect(r.raw.toString("binary")).toContain(`X-Sing365-Signed: skipped; ${reason}`);
+      expect(r.raw.toString("binary")).toContain(`X-Sigwide-Signed: skipped; ${reason}`);
       expect(r.raw.toString("binary").split("\r\n\r\n").slice(1).join("\r\n\r\n")).toBe(raw.toString("binary").split("\r\n\r\n").slice(1).join("\r\n\r\n"));
     }
   });
 
-  it("returns a message that already went through Sing365 exactly as it came", async () => {
-    const raw = message([...FROM, "Subject: x", "X-Sing365-Signed: 1", "Content-Type: text/plain"], "x\r\n");
+  it("returns a message that already went through Sigwide exactly as it came", async () => {
+    const raw = message([...FROM, "Subject: x", "X-Sigwide-Signed: 1", "Content-Type: text/plain"], "x\r\n");
     const r = await stampMessage(raw, sign);
     expect(r).toMatchObject({ status: "skipped", reason: "already_signed" });
     expect(r.raw.equals(raw)).toBe(true);
   });
 
   it("marks the message and changes nothing else when the sender has no signature", async () => {
-    const raw = message([...FROM, "Subject: x", "X-Sing365-Key: k", "Content-Type: text/plain"], "x\r\n");
+    const raw = message([...FROM, "Subject: x", "X-Sigwide-Key: k", "Content-Type: text/plain"], "x\r\n");
     const r = await stampMessage(raw, async () => null);
     expect(r).toMatchObject({ status: "skipped", reason: "no_signature" });
-    expect(r.raw.toString("binary")).toContain("X-Sing365-Signed: skipped; no_signature");
-    expect(r.raw.toString("binary")).not.toContain("X-Sing365-Key");
+    expect(r.raw.toString("binary")).toContain("X-Sigwide-Signed: skipped; no_signature");
+    expect(r.raw.toString("binary")).not.toContain("X-Sigwide-Key");
     expect(r.raw.toString("binary").endsWith("\r\n\r\nx\r\n")).toBe(true);
   });
 });

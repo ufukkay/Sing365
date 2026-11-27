@@ -59,7 +59,7 @@ describe.runIf(ADMIN_URL && APP_URL)("Postgres data layer + signature", () => {
   it("finds the tenant by its relay key, stores only a hash, and a new key replaces the old one", async () => {
     const data = postgresData(db);
     const first = await data.createRelayKey(tenantId);
-    expect(first).toMatch(/^s365_[A-Za-z0-9_-]{43}$/);
+    expect(first).toMatch(/^sgw_[A-Za-z0-9_-]{43}$/);
     expect((await data.getTenantByRelayKey(first))?.id).toBe(tenantId);
     const admin = postgres(ADMIN_URL!, { max: 1, onnotice: () => {} });
     const [row] = await admin<{ h: string }[]>`select relay_token_hash as h from tenants where id = ${tenantId}`;

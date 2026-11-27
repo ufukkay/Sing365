@@ -21,7 +21,7 @@ export default async function Onboarding({ searchParams }: { searchParams: Promi
       <Card className="w-full max-w-lg">
         <h1 className="text-2xl font-bold">Microsoft 365 kuruluşunuzu bağlayın</h1>
         <p className="mt-2 text-sm text-text-muted">
-          Sing365, imzalardaki ad, unvan, departman ve telefon bilgilerini dizininizden okur. Bunun için bir Microsoft 365
+          Sigwide, imzalardaki ad, unvan, departman ve telefon bilgilerini dizininizden okur. Bunun için bir Microsoft 365
           yöneticisinin kuruluş adına bir kez izin vermesi gerekir.
         </p>
         <ul className="mt-4 list-disc space-y-1 pl-5 text-sm">

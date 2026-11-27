@@ -9,7 +9,7 @@ export interface RelayConfig {
   tls: { key: Buffer; cert: Buffer } | null;
   /** Networks allowed to connect (CIDR). Defaults to Exchange Online's published sending ranges. */
   allowedNetworks: string[];
-  /** Base URL of the Sing365 web app, e.g. http://localhost:3000. */
+  /** Base URL of the Sigwide web app, e.g. http://localhost:3000. */
   apiUrl: string;
   /** Same value as RELAY_SECRET in the web app. */
   apiSecret: string;
