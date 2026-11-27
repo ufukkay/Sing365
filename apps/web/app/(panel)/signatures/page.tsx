@@ -95,7 +95,7 @@ export default async function SignaturesPage({ searchParams }: { searchParams: P
             action={current.value === "all" || current.value === "draft" ? <Link href="/signatures/new" className="text-sm font-semibold text-accent underline">İmza oluştur</Link> : undefined} />
         </Card>
       ) : (
-        <div className="grid items-start gap-4 md:grid-cols-2 xl:grid-cols-3">
+        <div className="grid items-start gap-4 md:grid-cols-2 xl:grid-cols-3 2xl:grid-cols-4">
           {visible.map((template) => {
             const archived = template.status === "archived";
             const active = template.status === "published";
@@ -107,7 +107,7 @@ export default async function SignaturesPage({ searchParams }: { searchParams: P
                   <div className="grid size-10 shrink-0 place-items-center rounded-md bg-accent-subtle text-accent"><FileText aria-hidden size={19} /></div>
                   <div className="min-w-0 flex-1">
                     <Link href={`/signatures/${template.id}`} className="block break-words font-semibold leading-5 text-text underline-offset-4 hover:text-accent hover:underline">{template.name}</Link>
-                    <p className="mt-1 text-xs text-text-muted">{date.format(new Date(template.updatedAt))}{Number.isFinite(order) && ` · Öncelik ${order}`}</p>
+                    <p className="mt-1 text-xs text-text-muted">{date.format(new Date(template.updatedAt))}{active && Number.isFinite(order) ? ` · Sıra ${order}` : ""}</p>
                   </div>
                   <Badge tone={active ? "success" : "neutral"}>{active ? "Aktif" : archived ? "Arşiv" : "Taslak"}</Badge>
                 </div>

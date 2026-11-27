@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { BarChart3, LayoutDashboard, Megaphone, PenLine, Plug, Send, Settings, Users } from "lucide-react";
+import { LayoutDashboard, PenLine, Plug, Send, Users } from "lucide-react";
 import { cx } from "./ui";
 
 const nav = [
@@ -11,38 +11,32 @@ const nav = [
   { href: "/signatures/apply", label: "İmza uygulama", icon: Send },
   { href: "/users", label: "Kişiler", icon: Users },
   { href: "/exchange", label: "Exchange bağlantısı", icon: Plug },
-  { href: "/campaigns", label: "Kampanyalar", icon: Megaphone, soon: true },
-  { href: "/analytics", label: "Analiz", icon: BarChart3, soon: true },
-  { href: "/settings", label: "Ayarlar", icon: Settings, soon: true },
 ];
 
-export function Sidebar() {
+export function Sidebar({ vertical = false }: { vertical?: boolean }) {
   const path = usePathname();
   return (
-    <nav aria-label="Ana menü" className="flex flex-col gap-1 p-3">
-      {nav.map(({ href, label, icon: Icon, soon }) => {
-        const active = href === "/"
-          ? path === "/"
-          : path === href || (path.startsWith(`${href}/`) && !(href === "/signatures" && path === "/signatures/apply"));
-        if (soon)
-          return (
-            <span key={href} className="flex items-center gap-3 rounded-md px-3 py-2 text-sm text-text-muted" aria-disabled="true">
-              <Icon aria-hidden className="size-4" />
-              {label}
-              <span className="ml-auto text-xs">yakında</span>
-            </span>
-          );
+    <nav
+      aria-label="Ana menü"
+      className={vertical ? "flex flex-col gap-1 p-3" : "flex flex-wrap items-center gap-1"}
+    >
+      {nav.map(({ href, label, icon: Icon }) => {
+        const active =
+          href === "/"
+            ? path === "/"
+            : path === href || (path.startsWith(`${href}/`) && !(href === "/signatures" && path === "/signatures/apply"));
         return (
           <Link
             key={href}
             href={href}
             aria-current={active ? "page" : undefined}
             className={cx(
-              "flex items-center gap-3 rounded-md px-3 py-2 text-sm font-medium",
-              active ? "bg-accent-subtle text-accent" : "text-text hover:bg-surface",
+              "inline-flex items-center gap-1.5 rounded-md px-2.5 py-1.5 text-xs font-semibold transition-colors whitespace-nowrap",
+              vertical && "px-3 py-2 text-sm",
+              active ? "bg-accent-subtle text-accent" : "text-text-muted hover:bg-surface hover:text-text",
             )}
           >
-            <Icon aria-hidden className="size-4" />
+            <Icon aria-hidden className="size-3.5 shrink-0" />
             {label}
           </Link>
         );

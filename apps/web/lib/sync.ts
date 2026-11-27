@@ -4,13 +4,22 @@ import { layoutFields } from "@sing365/render";
 import { data, getDb } from "./data";
 import { env } from "./env";
 
+const CORE_DIRECTORY_FIELDS = [
+  "job_title",
+  "department",
+  "company_name",
+  "office_location",
+  "business_phone",
+  "mobile_phone",
+];
+
 /** Runs a directory sync for one tenant with the app's own credentials. */
 export async function runSync(tenantId: string, entraTenantId: string, opts: { forceFull?: boolean } = {}): Promise<SyncResult | null> {
   const db = getDb();
   if (!db || !env.entraClientId || !env.entraClientSecret) return null;
 
   const [templates, rules] = await Promise.all([data.listTemplates(tenantId), data.listRules(tenantId)]);
-  const fields = new Set<string>();
+  const fields = new Set<string>(CORE_DIRECTORY_FIELDS);
   const templateIds = new Set<string>();
   for (const template of templates) {
     if (template.status === "archived") continue;

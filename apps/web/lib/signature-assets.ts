@@ -83,6 +83,40 @@ export async function storeSignatureAsset(db: Db, tenantId: string, bytes: Buffe
   });
 }
 
+const localAssetsKey = Symbol.for("sigwide.localSignatureAssets");
+type LocalAssetEntry = { content_type: ImageType; signature_content: Buffer };
+type LocalAssetStore = Map<string, LocalAssetEntry>;
+
+function localAssetStore(): LocalAssetStore {
+  const g = globalThis as Record<symbol, LocalAssetStore | undefined>;
+  if (!g[localAssetsKey]) g[localAssetsKey] = new Map();
+  return g[localAssetsKey]!;
+}
+
+export function isLocalAssetDemoMode(db: Db | null): boolean {
+  return !db && process.env.NODE_ENV !== "production";
+}
+
+export function isLoopbackOrigin(value: string | null): value is string {
+  if (!value || process.env.NODE_ENV === "production") return false;
+  try {
+    const url = new URL(value);
+    return url.protocol === "http:" && LOOPBACK_HOSTS.has(url.hostname) && url.pathname === "/" && !url.search && !url.hash;
+  } catch {
+    return false;
+  }
+}
+
+export function storeLocalSignatureAsset(bytes: Buffer, info: ImageInfo): string {
+  const id = randomUUID();
+  localAssetStore().set(id, { content_type: info.contentType, signature_content: bytes });
+  return id;
+}
+
+export function readLocalSignatureAsset(id: string): LocalAssetEntry | undefined {
+  return localAssetStore().get(id);
+}
+
 export function readSignatureAsset(db: Db, id: string) {
   return db.sql.begin(async (tx) => {
     await tx`select set_config('app.signature_asset_id', ${id}, true)`;

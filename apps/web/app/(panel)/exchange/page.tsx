@@ -13,7 +13,7 @@ export default async function ExchangePage() {
     <>
       <PageHeader
         title="Exchange bağlantısı"
-        description="Sigwide imzayı sunucu tarafında ekler: Exchange Online seçtiğiniz kişilerin postalarını Sigwide'a gönderir, imza eklenir ve posta Exchange'e geri döner. Outlook'tan, tarayıcıdan ya da telefondan, hangi cihazdan gönderilirse gönderilsin imza eklenir."
+        description="Giden e-postalara sunucu tarafında otomatik imza eklemek için bağlantı ayarları."
       />
       <ExchangeSetup relayHost={env.relayHost} keySet={tenant?.relayKeySet ?? false} />
     </>

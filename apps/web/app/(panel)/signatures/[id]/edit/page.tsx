@@ -33,7 +33,11 @@ export default async function EditSignature({ params }: { params: Promise<{ id: 
     );
   }
 
-  const me = session ? await data.findUserByEmail(tenantId, session.email) : null;
+  const [me, templates] = await Promise.all([
+    session ? data.findUserByEmail(tenantId, session.email) : Promise.resolve(null),
+    data.listTemplates(tenantId),
+  ]);
+  const existingNames = templates.filter((t) => t.kind === "signature" && t.id !== id).map((t) => t.name);
   const sources = me ? [{ label: `Dizin · ${me.displayName}`, values: fieldValues(me) }, ...visualSampleSources] : visualSampleSources;
 
   return (
@@ -42,7 +46,7 @@ export default async function EditSignature({ params }: { params: Promise<{ id: 
       <SignatureDesigner
         initial={{ id, name: template.name, layout: parsed.layout, status: template.status, version: template.version }}
         action={saveVisualTemplateAction} preview={previewVisualTemplateAction}
-        sources={sources} fields={visualFields}
+        sources={sources} fields={visualFields} existingNames={existingNames}
       />
     </>
   );

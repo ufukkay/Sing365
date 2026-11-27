@@ -97,6 +97,35 @@ describe("render", () => {
     expect(html).not.toContain('width="96"');
     expect(html).toContain("Ali");
   });
+
+  it("renders up to 5 columns with alignment, vertical alignment and vertical dividers", () => {
+    const l: Layout = {
+      ...layout,
+      elements: [
+        {
+          type: "columns",
+          gap: 12,
+          dividerColor: "#cccccc",
+          columns: [
+            { width: 90, align: "center", valign: "middle", gapAfter: 48, elements: [{ type: "text", text: "S1" }] },
+            { divider: true, align: "left", valign: "top", elements: [{ type: "text", text: "S2", label: "Türkçe Unvan" }] },
+            { align: "right", valign: "bottom", gapAfter: 64, elements: [{ type: "text", text: "S3" }] },
+            { elements: [{ type: "text", text: "S4", align: "center" }] },
+            { elements: [{ type: "text", text: "S5" }] },
+          ],
+        },
+      ],
+    };
+    const { html } = render(l, {});
+    expect(html).toContain("S1");
+    expect(html).toContain("S5");
+    expect(html).toContain('align="center" valign="middle" width="90"');
+    expect(html).toContain("border-left:1px solid #cccccc");
+    expect(html).toContain('width="23" style="width:23px;min-width:23px');
+    expect(html).toContain('width="64" style="width:64px;min-width:64px');
+    expect(html).toContain('align="right" valign="bottom"');
+    expect(html).not.toMatch(/<style|display:\s*flex|<svg|<div/i);
+  });
 });
 
 describe("validateLayout", () => {

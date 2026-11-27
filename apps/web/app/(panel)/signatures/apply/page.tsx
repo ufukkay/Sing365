@@ -170,8 +170,7 @@ export default async function ApplySignaturePage({
   return (
     <>
       <PageHeader
-        title="İmzayı uygula"
-        description="Bir şablon seçin ve hangi iletilere uygulanacağını belirleyin."
+        title="İmza uygulama"
         actions={<Link href="/signatures" className={linkButton}><ArrowLeft aria-hidden size={16} /> İmzalar</Link>}
       />
       {notice && (

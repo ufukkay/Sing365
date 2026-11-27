@@ -1,4 +1,4 @@
-import { isSignatureImageUrl, validateLayout, type Element, type FieldValues, type Layout, type TextStyle } from "@sing365/render";
+import { isSignatureImageUrl, validateLayout, type Align, type Element, type FieldValues, type Layout, type TextStyle, type VAlign } from "@sing365/render";
 import type { Rule } from "@sing365/rules";
 
 export const visualFields: { key: string; label: string; group: string }[] = [
@@ -33,6 +33,24 @@ export function hasSignatureContent(layout: Layout): boolean {
     return element.type === "columns" && element.columns.some((column) => column.elements.some(hasContent));
   }
   return Array.isArray(layout.elements) && layout.elements.some(hasContent);
+}
+
+/** Reads friendly custom labels attached to placeholders in a visual layout. */
+export function templateFieldLabels(layout: Layout): Record<string, string> {
+  const labels: Record<string, string> = {};
+  const token = /\{\{\s*([a-z][a-z0-9_.]*)(?:\|(?:upper|lower))?\s*\}\}/i;
+  function walk(elements: Element[]) {
+    for (const element of elements) {
+      if (element.type === "text" && element.label?.trim()) {
+        const match = token.exec(element.text);
+        if (match) labels[match[1]!.toLowerCase()] = element.label.trim();
+      } else if (element.type === "columns") {
+        for (const column of element.columns) walk(column.elements);
+      }
+    }
+  }
+  walk(layout?.elements ?? []);
+  return labels;
 }
 
 export const visualSampleSources: { label: string; values: FieldValues }[] = [
@@ -147,15 +165,40 @@ function readStyle(value: unknown): TextStyle | undefined {
   };
 }
 
+function readAlign(value: unknown): Align | undefined {
+  if (value === undefined) return undefined;
+  if (value === "left" || value === "center" || value === "right") return value;
+  throw new Error("Geçerli bir yatay hizalama seçin.");
+}
+
+function readVAlign(value: unknown): VAlign | undefined {
+  if (value === undefined) return undefined;
+  if (value === "top" || value === "middle" || value === "bottom") return value;
+  throw new Error("Geçerli bir dikey hizalama seçin.");
+}
+
+function readLabel(value: unknown): string | undefined {
+  if (value === undefined || value === "") return undefined;
+  const label = readText(value, 60, "Alan adı").trim();
+  return label || undefined;
+}
+
 function readElements(value: unknown, maxWidth: number, allowColumns: boolean, count: { total: number }): Element[] {
   if (!Array.isArray(value)) throw new Error("İmza blokları okunamadı.");
   count.total += value.length;
-  if (count.total > 60) throw new Error("Bir imzada en fazla 60 blok kullanabilirsiniz.");
+  if (count.total > 100) throw new Error("Bir imzada en fazla 100 blok kullanabilirsiniz.");
   return value.map((item): Element => {
     const element = record(item, "İmza bloğu geçersiz.");
     switch (element.type) {
       case "text":
-        return { type: "text", text: readText(element.text, 2_000, "İmza"), style: readStyle(element.style), href: readHref(element.href) };
+        return {
+          type: "text",
+          text: readText(element.text, 2_000, "İmza"),
+          label: readLabel(element.label),
+          style: readStyle(element.style),
+          href: readHref(element.href),
+          align: readAlign(element.align),
+        };
       case "image": {
         const alt = readText(element.alt, 160, "Görsel açıklaması").trim();
         if (!alt || /\{\{|\}\}/.test(alt)) throw new Error("Görsel için kısa ve sabit bir açıklama girin.");
@@ -166,6 +209,7 @@ function readElements(value: unknown, maxWidth: number, allowColumns: boolean, c
           width: integer(element.width, 1, maxWidth, "Görsel genişliği"),
           height: integer(element.height, 1, 600, "Görsel yüksekliği"),
           href: readHref(element.href),
+          align: readAlign(element.align),
         };
       }
       case "divider":
@@ -192,16 +236,25 @@ function readElements(value: unknown, maxWidth: number, allowColumns: boolean, c
       }
       case "columns": {
         if (!allowColumns) throw new Error("Sütunların içine ikinci bir sütun bloğu eklenemez.");
-        if (!Array.isArray(element.columns) || element.columns.length < 2 || element.columns.length > 3) {
-          throw new Error("Bir satıra iki veya üç sütun ekleyin.");
+        if (!Array.isArray(element.columns) || element.columns.length < 2 || element.columns.length > 5) {
+          throw new Error("Bir satırda 2 ile 5 arasında sütun kullanabilirsiniz.");
         }
         return {
           type: "columns",
-          gap: element.gap === undefined ? undefined : integer(element.gap, 0, 32, "Sütun aralığı"),
+          gap: element.gap === undefined ? undefined : integer(element.gap, 0, 160, "Sütun aralığı"),
+          dividerColor: element.dividerColor === undefined ? undefined : color(element.dividerColor),
+          spread: element.spread === undefined ? undefined : boolean(element.spread, "Sütunları yay"),
           columns: element.columns.map((item: unknown) => {
             const column = record(item, "Sütun geçersiz.");
             const width = column.width === undefined ? undefined : integer(column.width, 1, maxWidth, "Sütun genişliği");
-            return { width, elements: readElements(column.elements, width ?? maxWidth, false, count) };
+            return {
+              width,
+              align: readAlign(column.align),
+              valign: readVAlign(column.valign),
+              divider: column.divider === undefined ? undefined : boolean(column.divider, "Dikey ayırıcı"),
+              gapAfter: column.gapAfter === undefined ? undefined : integer(column.gapAfter, 0, 160, "Sütun sonrası boşluk"),
+              elements: readElements(column.elements, width ?? maxWidth, false, count),
+            };
           }),
         };
       }
@@ -217,7 +270,7 @@ export function parseVisualLayout(input: unknown): VisualLayoutResult {
     const source = record(input, "İmza düzeni okunamadı.");
     if (source.version !== 1) throw new Error("İmza düzeninin sürümü desteklenmiyor.");
     const colors = record(source.colors, "İmza renkleri okunamadı.");
-    const maxWidth = source.maxWidth === undefined ? 600 : integer(source.maxWidth, 160, 600, "İmza genişliği");
+    const maxWidth = source.maxWidth === undefined ? 800 : integer(source.maxWidth, 160, 800, "İmza genişliği");
     const layout: Layout = {
       version: 1,
       fontStack: fontStack(source.fontStack),

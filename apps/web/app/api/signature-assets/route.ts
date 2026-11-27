@@ -1,6 +1,14 @@
 import { getDb } from "@/lib/data";
 import { readSession } from "@/lib/session";
-import { inspectSignatureImage, SIGNATURE_ASSET_MAX_BYTES, signatureAssetOrigin, storeSignatureAsset } from "@/lib/signature-assets";
+import {
+  inspectSignatureImage,
+  isLocalAssetDemoMode,
+  isLoopbackOrigin,
+  SIGNATURE_ASSET_MAX_BYTES,
+  signatureAssetOrigin,
+  storeLocalSignatureAsset,
+  storeSignatureAsset,
+} from "@/lib/signature-assets";
 
 const MAX_BODY_BYTES = SIGNATURE_ASSET_MAX_BYTES + 8 * 1024;
 
@@ -31,11 +39,15 @@ async function readBody(request: Request): Promise<Uint8Array<ArrayBuffer> | nul
 
 export async function POST(request: Request) {
   const db = getDb();
-  const origin = signatureAssetOrigin();
-  if (!db || !origin) return error("Bu ortamda logo yükleme yapılandırılmamış.", 503);
-  if (request.headers.get("origin") !== origin) return error("Geçersiz yükleme isteği.", 403);
-  const session = await readSession();
-  if (!session?.tenantId) return error("Logo yüklemek için oturum açmalısınız.", 401);
+  const demoMode = isLocalAssetDemoMode(db);
+  const reqOrigin = request.headers.get("origin");
+  const configuredOrigin = signatureAssetOrigin();
+  const origin = demoMode && isLoopbackOrigin(reqOrigin) ? reqOrigin : configuredOrigin;
+  if ((!db && !demoMode) || !origin) return error("Bu ortamda logo yükleme yapılandırılmamış.", 503);
+  if (reqOrigin !== origin) return error("Geçersiz yükleme isteği.", 403);
+  const session = demoMode ? null : await readSession();
+  const tenantId = session?.tenantId;
+  if (!demoMode && !tenantId) return error("Logo yüklemek için oturum açmalısınız.", 401);
 
   const contentType = request.headers.get("content-type") ?? "";
   if (!/^multipart\/form-data\s*;/i.test(contentType)) return error("Bir görsel dosyası seçin.", 415);
@@ -58,7 +70,7 @@ export async function POST(request: Request) {
   if (!info) return error("En fazla 2048 × 2048 piksel boyutunda bir PNG, JPEG veya GIF dosyası seçin.", 415);
 
   try {
-    const id = await storeSignatureAsset(db, session.tenantId, bytes, info);
+    const id = demoMode ? storeLocalSignatureAsset(bytes, info) : await storeSignatureAsset(db!, tenantId!, bytes, info);
     return Response.json({ url: `${origin}/api/signature-assets/${id}`, width: info.width, height: info.height }, { status: 201 });
   } catch {
     return error("Logo kaydedilemedi. Tekrar deneyin.", 500);

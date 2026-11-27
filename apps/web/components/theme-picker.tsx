@@ -8,6 +8,12 @@ type Theme = "system" | "light" | "dark";
 const storageKey = "sigwide-theme";
 const changeEvent = "sigwide:theme-change";
 
+const options: { value: Theme; label: string; icon: typeof Sun }[] = [
+  { value: "light", label: "Aydınlık", icon: Sun },
+  { value: "dark", label: "Koyu", icon: Moon },
+  { value: "system", label: "Sistem", icon: Monitor },
+];
+
 function getTheme(): Theme {
   const theme = document.documentElement.dataset.theme;
   return theme === "light" || theme === "dark" ? theme : "system";
@@ -36,30 +42,44 @@ function subscribe(onChange: () => void) {
 
 export function ThemePicker() {
   const theme = useSyncExternalStore(subscribe, getTheme, (): Theme => "system");
-  const Icon = theme === "light" ? Sun : theme === "dark" ? Moon : Monitor;
+
+  function choose(preference: Theme) {
+    setTheme(preference);
+    try {
+      window.localStorage.setItem(storageKey, preference);
+    } catch {
+      // Selection still applies to the current page.
+    }
+    window.dispatchEvent(new Event(changeEvent));
+  }
 
   return (
-    <label className="relative inline-flex shrink-0 items-center">
-      <span className="sr-only">Tema</span>
-      <Icon aria-hidden="true" className="pointer-events-none absolute left-2.5 size-4 text-accent" />
-      <select
-        className="h-9 rounded-md border border-border bg-surface-raised pl-8 pr-2 text-xs font-semibold text-text transition-colors hover:border-border-input"
-        value={theme}
-        onChange={(event) => {
-          const preference = event.currentTarget.value;
-          setTheme(preference);
-          try {
-            window.localStorage.setItem(storageKey, preference);
-          } catch {
-            // The selection still applies to the current page.
-          }
-          window.dispatchEvent(new Event(changeEvent));
-        }}
-      >
-        <option value="system">Sistem</option>
-        <option value="light">Aydınlık</option>
-        <option value="dark">Koyu</option>
-      </select>
-    </label>
+    <div
+      role="group"
+      aria-label="Tema seçimi"
+      className="inline-flex shrink-0 items-center gap-0.5 rounded-lg border border-border bg-surface p-0.5"
+    >
+      {options.map(({ value, label, icon: Icon }) => {
+        const active = theme === value;
+        return (
+          <button
+            key={value}
+            type="button"
+            title={label}
+            aria-label={label}
+            aria-pressed={active}
+            onClick={() => choose(value)}
+            className={`inline-flex h-7 items-center gap-1 rounded-md px-2 text-xs font-medium transition-colors ${
+              active
+                ? "bg-surface-raised text-accent shadow-xs"
+                : "text-text-muted hover:text-text"
+            }`}
+          >
+            <Icon aria-hidden="true" className="size-3.5" />
+            <span className="hidden sm:inline">{label}</span>
+          </button>
+        );
+      })}
+    </div>
   );
 }

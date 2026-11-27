@@ -15,6 +15,18 @@ import sanitizeHtml from "sanitize-html";
 
 export type FieldValues = Record<string, string | null | undefined>;
 
+export type Align = "left" | "center" | "right";
+export type VAlign = "top" | "middle" | "bottom";
+
+export interface Column {
+  width?: number;
+  align?: Align;
+  valign?: VAlign;
+  divider?: boolean;
+  gapAfter?: number;
+  elements: Element[];
+}
+
 export interface TextStyle {
   size?: number; // px, clamped 11..20
   bold?: boolean;
@@ -23,12 +35,12 @@ export interface TextStyle {
 }
 
 export type Element =
-  | { type: "text"; text: string; style?: TextStyle; href?: string }
-  | { type: "image"; src: string; alt: string; width: number; height: number; href?: string }
+  | { type: "text"; text: string; label?: string; style?: TextStyle; href?: string; align?: Align }
+  | { type: "image"; src: string; alt: string; width: number; height: number; href?: string; align?: Align }
   | { type: "divider"; color?: string }
   | { type: "spacer"; height: number }
   | { type: "social"; links: { network: string; url: string; icon: string; label: string }[]; size?: number }
-  | { type: "columns"; columns: { width?: number; elements: Element[] }[]; gap?: number }
+  | { type: "columns"; columns: Column[]; gap?: number; dividerColor?: string; spread?: boolean }
   | { type: "html"; html: string };
 
 export interface Layout {
@@ -80,7 +92,8 @@ export function isSignatureImageUrl(value: string): boolean {
     if (url.username || url.password) return false;
     if (url.protocol === "https:") return true;
     // Loopback media is only for inspecting uploaded logos during local development.
-    return process.env.NODE_ENV !== "production" && url.protocol === "http:"
+    const nodeEnv = (globalThis as { process?: { env?: { NODE_ENV?: string } } }).process?.env?.NODE_ENV;
+    return nodeEnv !== "production" && url.protocol === "http:"
       && ["localhost", "127.0.0.1", "[::1]"].includes(url.hostname)
       && /^\/api\/signature-assets\/[\da-f]{8}-[\da-f]{4}-4[\da-f]{3}-[89ab][\da-f]{3}-[\da-f]{12}$/i.test(url.pathname)
       && !url.search && !url.hash;
@@ -299,11 +312,14 @@ function textStyle(ctx: Ctx, st: TextStyle | undefined): string {
   return parts.join(";");
 }
 
-function row(inner: string): string {
-  return `<tr><td style="padding:0">${inner}</td></tr>`;
+function row(inner: string, align?: Align, extraStyle = ""): string {
+  const alignPart = align === "center" || align === "right" ? `;text-align:${align}` : "";
+  const alignAttr = align === "center" || align === "right" ? ` align="${align}"` : "";
+  const style = `padding:0${extraStyle ? `;${extraStyle}` : ""}${alignPart}`;
+  return `<tr><td${alignAttr} style="${style}">${inner}</td></tr>`;
 }
 
-function renderElement(ctx: Ctx, el: Element, text: string[]): string | null {
+function renderElement(ctx: Ctx, el: Element, text: string[], defaultAlign?: Align): string | null {
   const l = ctx.layout;
   switch (el.type) {
     case "text": {
@@ -316,7 +332,7 @@ function renderElement(ctx: Ctx, el: Element, text: string[]): string | null {
       const body = href
         ? `<a href="${href}" style="${style};color:${safeColor(el.style?.color, l.colors.link)};text-decoration:none">${html}</a>`
         : html;
-      return row(`<span style="${style}">${body}</span>`);
+      return row(`<span style="${style}">${body}</span>`, el.align ?? defaultAlign, style);
     }
     case "image": {
       const src = safeHref(ctx, el.src);
@@ -324,9 +340,11 @@ function renderElement(ctx: Ctx, el: Element, text: string[]): string | null {
       const alt = fill(ctx, el.alt, escapeHtml) ?? "";
       const w = Math.max(1, Math.min(l.maxWidth ?? 600, Math.round(el.width)));
       const h = Math.max(1, Math.round(el.height));
-      const img = `<img src="${src}" alt="${alt}" width="${w}" height="${h}" style="display:block;border:0;width:${w}px;height:${h}px">`;
+      const align = el.align ?? defaultAlign;
+      const margin = align === "center" ? ";margin:0 auto" : align === "right" ? ";margin:0 0 0 auto" : "";
+      const img = `<img src="${src}" alt="${alt}" width="${w}" height="${h}" style="display:block;border:0;width:${w}px;height:${h}px${margin}">`;
       const href = safeHref(ctx, el.href);
-      return row(href ? `<a href="${href}">${img}</a>` : img);
+      return row(href ? `<a href="${href}">${img}</a>` : img, align);
     }
     case "divider": {
       const c = safeColor(el.color, l.colors.divider ?? "#dddddd");
@@ -349,36 +367,65 @@ function renderElement(ctx: Ctx, el: Element, text: string[]): string | null {
         })
         .filter(Boolean);
       if (cells.length === 0) return null;
-      return row(`<table role="presentation" cellpadding="0" cellspacing="0" border="0"><tr>${cells.join("")}</tr></table>`);
+      return row(`<table role="presentation" cellpadding="0" cellspacing="0" border="0"><tr>${cells.join("")}</tr></table>`, defaultAlign);
     }
     case "html": {
       const html = renderHtml(ctx, el.html);
       if (!html) return null;
       const plain = htmlToText(html);
       if (plain) text.push(plain);
-      return row(html);
+      return row(html, defaultAlign);
     }
     case "columns": {
-      const gap = Math.max(0, Math.min(32, el.gap ?? 16));
-      const cols = el.columns
-        .map((c, i) => {
-          const inner = renderList(ctx, c.elements, text);
-          if (!inner) return null;
-          const width = c.width ? ` width="${Math.round(c.width)}"` : "";
-          const pad = i < el.columns.length - 1 ? `padding:0 ${gap}px 0 0;` : "";
-          return `<td valign="top"${width} style="${pad}vertical-align:top">${inner}</td>`;
-        })
-        .filter(Boolean);
-      if (cols.length === 0) return null;
-      return row(`<table role="presentation" cellpadding="0" cellspacing="0" border="0"><tr>${cols.join("")}</tr></table>`);
+      const gap = Math.max(0, Math.min(160, Math.round(el.gap ?? 16)));
+      const divColor = safeColor(el.dividerColor, l.colors.divider ?? "#dddddd");
+      const rendered = el.columns
+        .map((col) => ({ col, inner: renderList(ctx, col.elements, text, col.align) }))
+        .filter((entry): entry is { col: Column; inner: string } => entry.inner !== null);
+      if (rendered.length === 0) return null;
+      const autoCount = rendered.filter(({ col }) => !col.width).length;
+      const autoPct = el.spread && autoCount > 0 ? Math.floor(100 / autoCount) : undefined;
+      const cells: string[] = [];
+      for (let i = 0; i < rendered.length; i++) {
+        const { col, inner } = rendered[i]!;
+        const widthAttr = col.width ? ` width="${Math.round(col.width)}"` : autoPct ? ` width="${autoPct}%"` : "";
+        const valign = col.valign === "middle" || col.valign === "bottom" ? col.valign : "top";
+        const align = col.align === "center" || col.align === "right" ? col.align : undefined;
+        const alignAttr = align ? ` align="${align}"` : "";
+        const cellStyle = [`padding:0`, `vertical-align:${valign}`];
+        if (col.width) cellStyle.push(`width:${Math.round(col.width)}px`);
+        if (align) cellStyle.push(`text-align:${align}`);
+        cells.push(`<td${alignAttr} valign="${valign}"${widthAttr} style="${cellStyle.join(";")}">${inner}</td>`);
+
+        if (i < rendered.length - 1) {
+          const colGap = Math.max(0, Math.min(160, Math.round(col.gapAfter ?? gap)));
+          const hasDivider = Boolean(rendered[i + 1]?.col.divider);
+          if (hasDivider) {
+            const leftHalf = Math.max(4, Math.floor(Math.max(0, colGap - 1) / 2));
+            const rightHalf = Math.max(4, Math.max(0, colGap - 1) - leftHalf);
+            cells.push(
+              `<td width="${leftHalf}" style="width:${leftHalf}px;min-width:${leftHalf}px;padding:0;font-size:0;line-height:0">&nbsp;</td>` +
+                `<td width="1" style="width:1px;border-left:1px solid ${divColor};padding:0;font-size:0;line-height:0">&nbsp;</td>` +
+                `<td width="${rightHalf}" style="width:${rightHalf}px;min-width:${rightHalf}px;padding:0;font-size:0;line-height:0">&nbsp;</td>`,
+            );
+          } else if (colGap > 0) {
+            cells.push(
+              `<td width="${colGap}" style="width:${colGap}px;min-width:${colGap}px;padding:0;font-size:0;line-height:0">&nbsp;</td>`,
+            );
+          }
+        }
+      }
+      const tableWidth = el.spread ? ' width="100%"' : "";
+      return row(`<table role="presentation" cellpadding="0" cellspacing="0" border="0"${tableWidth} style="border-collapse:collapse"><tr>${cells.join("")}</tr></table>`);
     }
   }
 }
 
-function renderList(ctx: Ctx, elements: Element[], text: string[]): string | null {
-  const rows = elements.map((e) => renderElement(ctx, e, text)).filter((r): r is string => r !== null);
+function renderList(ctx: Ctx, elements: Element[], text: string[], defaultAlign?: Align): string | null {
+  const rows = elements.map((e) => renderElement(ctx, e, text, defaultAlign)).filter((r): r is string => r !== null);
   if (rows.length === 0) return null;
-  return `<table role="presentation" cellpadding="0" cellspacing="0" border="0" style="border-collapse:collapse">${rows.join("")}</table>`;
+  const widthAttr = defaultAlign === "center" || defaultAlign === "right" ? ' width="100%"' : "";
+  return `<table role="presentation" cellpadding="0" cellspacing="0" border="0"${widthAttr} style="border-collapse:collapse">${rows.join("")}</table>`;
 }
 
 export function render(layout: Layout, values: FieldValues): RenderResult {
@@ -386,7 +433,10 @@ export function render(layout: Layout, values: FieldValues): RenderResult {
   const text: string[] = [];
   const inner = renderList(ctx, layout.elements, text) ?? "";
   const maxWidth = layout.maxWidth ?? 600;
-  const html = `<table role="presentation" cellpadding="0" cellspacing="0" border="0" style="max-width:${maxWidth}px;border-collapse:collapse" data-sigwide="1"><tr><td style="padding:0">${inner}</td></tr></table>`;
+  const hasSpread = (layout.elements ?? []).some((el) => el.type === "columns" && el.spread);
+  const widthAttr = hasSpread ? ' width="100%"' : "";
+  const innerTable = hasSpread && inner.startsWith("<table ") ? inner.replace("<table ", '<table width="100%" ') : inner;
+  const html = `<table role="presentation" cellpadding="0" cellspacing="0" border="0"${widthAttr} style="max-width:${maxWidth}px;border-collapse:collapse" data-sigwide="1"><tr><td style="padding:0">${innerTable}</td></tr></table>`;
   return {
     html,
     text: text.join("\n"),

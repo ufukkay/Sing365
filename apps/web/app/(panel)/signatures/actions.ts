@@ -75,13 +75,40 @@ export async function previewVisualTemplateAction(layout: Layout, values: FieldV
   return { html, text, missing };
 }
 
+function normalizeSignatureName(value: string) {
+  return value.trim().replace(/\s+/g, " ").toLocaleLowerCase("tr-TR");
+}
+
+async function duplicateNameError(tenantId: string, name: string, excludeId?: string): Promise<string | null> {
+  const target = normalizeSignatureName(name);
+  const templates = await data.listTemplates(tenantId);
+  const match = templates.find((t) => t.kind === "signature" && t.id !== excludeId && normalizeSignatureName(t.name) === target);
+  if (!match) return null;
+  return match.status === "archived"
+    ? `“${name}” adında arşivlenmiş bir imza zaten var. Farklı bir ad girin veya arşivden geri alın.`
+    : `“${name}” adında bir imza zaten var. Farklı bir ad girin.`;
+}
+
+async function uniqueCopyName(tenantId: string, baseName: string): Promise<string> {
+  const templates = await data.listTemplates(tenantId);
+  const used = new Set(templates.filter((t) => t.kind === "signature").map((t) => normalizeSignatureName(t.name)));
+  const cleanBase = baseName.replace(/\s*·\s*Kopya(?:\s+\d+)?$/i, "").slice(0, 84).trim();
+  for (let n = 1; n <= 999; n++) {
+    const candidate = n === 1 ? `${cleanBase} · Kopya` : `${cleanBase} · Kopya ${n}`;
+    if (!used.has(normalizeSignatureName(candidate))) return candidate;
+  }
+  return `${cleanBase.slice(0, 76)} · ${Date.now()}`;
+}
+
 export async function saveVisualTemplateAction(_prev: VisualFormState, form: FormData): Promise<VisualFormState> {
   const { tenantId } = await requirePanel();
   const id = String(form.get("id") ?? "");
-  const name = String(form.get("name") ?? "").trim();
+  const name = String(form.get("name") ?? "").trim().replace(/\s+/g, " ");
   const parsed = submittedLayout(form);
   if (!parsed.layout) return { errors: parsed.errors };
   if (!name || name.length > 100) return { errors: ["İmza adı 1–100 karakter arasında olmalı."] };
+  const duplicate = await duplicateNameError(tenantId, name, id || undefined);
+  if (duplicate) return { errors: [duplicate] };
   if (id) {
     const existing = await data.getTemplate(tenantId, id);
     if (existing?.kind !== "signature" || existing.status === "archived" || !parseVisualLayout(existing.layout).layout) {
@@ -190,8 +217,9 @@ export async function duplicateVisualTemplateAction(form: FormData) {
   const parsed = parseVisualLayout(template?.layout);
   if (template?.kind !== "signature" || !parsed.layout) redirect("/signatures");
   const rule = simpleVisualRule((await data.listRules(tenantId)).filter((entry) => entry.templateId === id));
+  const copyName = await uniqueCopyName(tenantId, template.name);
   const newId = await data.createTemplateWithRule(tenantId, {
-    name: `${template.name.slice(0, 88)} · Kopya`,
+    name: copyName,
     kind: "signature",
     status: "draft",
     layout: parsed.layout,
@@ -210,6 +238,8 @@ export async function saveHtmlTemplateAction(_prev: HtmlFormState, form: FormDat
   const html = String(form.get("html") ?? "");
   const values = { name, html, appliesTo: String(form.get("appliesTo") ?? "both"), priority: String(form.get("priority") ?? "50") };
   const errors = htmlProblems(name, html);
+  const duplicate = await duplicateNameError(tenantId, name, id || undefined);
+  if (duplicate) errors.push(duplicate);
   if (errors.length > 0) return { errors, values };
 
   let templateId = id;

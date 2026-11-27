@@ -11,18 +11,22 @@ export const metadata = { title: "Yeni imza" };
 
 export default async function NewSignature() {
   const { tenantId, session } = await requirePanel();
-  const me = session ? await data.findUserByEmail(tenantId, session.email) : null;
+  const [me, templates] = await Promise.all([
+    session ? data.findUserByEmail(tenantId, session.email) : Promise.resolve(null),
+    data.listTemplates(tenantId),
+  ]);
+  const existingNames = templates.filter((t) => t.kind === "signature").map((t) => t.name);
   const sources = me ? [{ label: `Dizin · ${me.displayName}`, values: fieldValues(me) }, ...visualSampleSources] : visualSampleSources;
 
   return (
     <>
       <PageHeader
-        title="İmza tasarla"
+        title="Yeni imza"
         actions={<Link href="/signatures" className="text-sm font-medium text-accent underline-offset-4 hover:underline">Tüm imzalar</Link>}
       />
       <SignatureDesigner
         action={saveVisualTemplateAction} preview={previewVisualTemplateAction}
-        sources={sources} fields={visualFields}
+        sources={sources} fields={visualFields} existingNames={existingNames}
       />
     </>
   );
