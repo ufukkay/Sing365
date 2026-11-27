@@ -1,0 +1,17 @@
+{
+	# One certificate authority, so the relay knows where its certificate file is.
+	acme_ca https://acme-v02.api.letsencrypt.org/directory
+	# RSA keys: Exchange Online checks the relay's certificate when it hands mail back.
+	key_type rsa2048
+}
+
+# The panel.
+{$SIGWIDE_HOST} {
+	encode zstd gzip
+	reverse_proxy web:3000
+}
+
+# The mail relay's name. Caddy only fetches and renews its certificate; the relay (port 25) reads it.
+{$SIGWIDE_RELAY_HOST} {
+	respond "Sigwide mail relay" 200
+}

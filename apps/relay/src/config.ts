@@ -1,4 +1,4 @@
-import { readFileSync } from "node:fs";
+import { existsSync, readFileSync } from "node:fs";
 
 export interface RelayConfig {
   /** Port Exchange Online connects to. 25 in production. */
@@ -40,11 +40,26 @@ export const EXCHANGE_ONLINE_NETWORKS = [
 
 const list = (v: string | undefined) => (v ?? "").split(",").map((s) => s.trim()).filter(Boolean);
 
-export function configFromEnv(env: NodeJS.ProcessEnv = process.env): RelayConfig {
-  const production = env.NODE_ENV === "production";
+export interface TlsFiles {
+  keyFile: string;
+  certFile: string;
+}
+
+export function tlsFilesFromEnv(env: NodeJS.ProcessEnv = process.env): TlsFiles | null {
   const keyFile = env.RELAY_TLS_KEY_FILE;
   const certFile = env.RELAY_TLS_CERT_FILE;
-  const tls = keyFile && certFile ? { key: readFileSync(keyFile), cert: readFileSync(certFile) } : null;
+  return keyFile && certFile ? { keyFile, certFile } : null;
+}
+
+/** True once both files exist (the certificate may still be on its way from the HTTPS proxy). */
+export const tlsFilesReady = (f: TlsFiles) => existsSync(f.keyFile) && existsSync(f.certFile);
+
+export const readTls = (f: TlsFiles) => ({ key: readFileSync(f.keyFile), cert: readFileSync(f.certFile) });
+
+export function configFromEnv(env: NodeJS.ProcessEnv = process.env): RelayConfig {
+  const production = env.NODE_ENV === "production";
+  const files = tlsFilesFromEnv(env);
+  const tls = files ? readTls(files) : null;
   const cfg: RelayConfig = {
     port: Number(env.RELAY_PORT ?? (production ? 25 : 2525)),
     hostName: env.RELAY_HOSTNAME ?? "localhost",

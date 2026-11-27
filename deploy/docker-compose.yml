@@ -1,0 +1,98 @@
+# Sigwide on one server: HTTPS proxy, database, panel, mail relay and the scheduled directory sync.
+# Settings come from deploy/.env (install.sh writes it). Start or update with:  docker compose up -d --build
+name: sigwide
+
+x-logging: &logging
+  driver: json-file
+  options: { max-size: "10m", max-file: "5" }
+
+services:
+  caddy:
+    image: caddy:2
+    restart: unless-stopped
+    ports: ["80:80", "443:443", "443:443/udp"]
+    environment:
+      SIGWIDE_HOST: ${SIGWIDE_HOST}
+      SIGWIDE_RELAY_HOST: ${SIGWIDE_RELAY_HOST}
+    volumes:
+      - ./Caddyfile:/etc/caddy/Caddyfile:ro
+      - caddy_data:/data
+      - caddy_config:/config
+    depends_on: [web]
+    logging: *logging
+
+  postgres:
+    image: postgres:17-alpine
+    restart: unless-stopped
+    environment:
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
+      DB_APP_PASSWORD: ${DB_APP_PASSWORD}
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+      - ./postgres-init.sh:/docker-entrypoint-initdb.d/10-app-role.sh:ro
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -h 127.0.0.1 -U postgres -d sing365"]
+      interval: 5s
+      timeout: 5s
+      retries: 30
+    logging: *logging
+
+  web:
+    build: { context: .., dockerfile: deploy/Dockerfile, target: web }
+    image: sigwide-web
+    restart: unless-stopped
+    depends_on:
+      postgres: { condition: service_healthy }
+    # Reachable by Caddy inside Docker, and by the relay on this server only.
+    ports: ["127.0.0.1:3000:3000"]
+    environment:
+      DATABASE_URL: postgresql://sing365_app:${DB_APP_PASSWORD}@postgres:5432/sing365
+      SING365_PUBLIC_URL: https://${SIGWIDE_HOST}
+      ENTRA_CLIENT_ID: ${ENTRA_CLIENT_ID}
+      ENTRA_CLIENT_SECRET: ${ENTRA_CLIENT_SECRET}
+      SESSION_SECRET: ${SESSION_SECRET}
+      CRON_SECRET: ${CRON_SECRET}
+      RELAY_SECRET: ${RELAY_SECRET}
+    logging: *logging
+
+  relay:
+    build: { context: .., dockerfile: deploy/Dockerfile, target: relay }
+    image: sigwide-relay
+    restart: unless-stopped
+    depends_on: [web, caddy]
+    # The host's network, so the relay sees Exchange Online's real addresses (IPv4 and IPv6) for its allow-list.
+    network_mode: host
+    # Root inside the container only to read Caddy's certificate and bind port 25; nothing else is allowed.
+    user: "0:0"
+    cap_drop: [ALL]
+    cap_add: [NET_BIND_SERVICE]
+    read_only: true
+    security_opt: ["no-new-privileges:true"]
+    environment:
+      NODE_ENV: production
+      RELAY_PORT: "25"
+      RELAY_HOSTNAME: ${SIGWIDE_RELAY_HOST}
+      RELAY_TLS_CERT_FILE: /caddy/caddy/certificates/acme-v02.api.letsencrypt.org-directory/${SIGWIDE_RELAY_HOST}/${SIGWIDE_RELAY_HOST}.crt
+      RELAY_TLS_KEY_FILE: /caddy/caddy/certificates/acme-v02.api.letsencrypt.org-directory/${SIGWIDE_RELAY_HOST}/${SIGWIDE_RELAY_HOST}.key
+      SING365_API_URL: http://127.0.0.1:3000
+      RELAY_SECRET: ${RELAY_SECRET}
+    volumes:
+      - caddy_data:/caddy:ro
+    logging: *logging
+
+  cron:
+    # Same image as the panel (built once, from the cache).
+    build: { context: .., dockerfile: deploy/Dockerfile, target: web }
+    image: sigwide-web
+    restart: unless-stopped
+    depends_on: [web]
+    command: ["node", "cron.mjs"]
+    environment:
+      CRON_SECRET: ${CRON_SECRET}
+      SYNC_EVERY_MINUTES: "30"
+    logging: *logging
+
+volumes:
+  caddy_data:
+  caddy_config:
+  postgres_data:
