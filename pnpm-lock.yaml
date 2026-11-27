@@ -12,12 +12,21 @@ importers:
 
   apps/web:
     dependencies:
+      '@sing365/db':
+        specifier: workspace:*
+        version: link:../../packages/db
+      '@sing365/graph':
+        specifier: workspace:*
+        version: link:../../packages/graph
       '@sing365/render':
         specifier: workspace:*
         version: link:../../packages/render
       '@sing365/rules':
         specifier: workspace:*
         version: link:../../packages/rules
+      jose:
+        specifier: ^6.0.0
+        version: 6.2.18
       lucide-react:
         specifier: ^1.0.0
         version: 1.82.0(@types/react@19.3.3)(react@19.3.1)
@@ -30,6 +39,9 @@ importers:
       react-dom:
         specifier: ^19.0.0
         version: 19.3.1(react@19.3.1)
+      server-only:
+        specifier: ^0.0.1
+        version: 0.0.1
     devDependencies:
       '@tailwindcss/postcss':
         specifier: ^4.0.0
@@ -43,9 +55,47 @@ importers:
       '@types/react-dom':
         specifier: ^19.0.0
         version: 19.3.0(@types/react@19.3.3)
+      postgres:
+        specifier: ^3.4.0
+        version: 3.4.9
       tailwindcss:
         specifier: ^4.0.0
         version: 4.3.5
+      typescript:
+        specifier: ~5.9.0
+        version: 5.9.3
+      vitest:
+        specifier: ^4.0.0
+        version: 4.1.12(@types/node@22.20.7)(vite@8.4.0(@types/node@22.20.7)(jiti@2.7.0))
+
+  packages/db:
+    dependencies:
+      postgres:
+        specifier: ^3.4.0
+        version: 3.4.9
+    devDependencies:
+      '@types/node':
+        specifier: ^22.0.0
+        version: 22.20.7
+      typescript:
+        specifier: ~5.9.0
+        version: 5.9.3
+      vitest:
+        specifier: ^4.0.0
+        version: 4.1.12(@types/node@22.20.7)(vite@8.4.0(@types/node@22.20.7)(jiti@2.7.0))
+
+  packages/graph:
+    dependencies:
+      '@sing365/db':
+        specifier: workspace:*
+        version: link:../db
+    devDependencies:
+      '@types/node':
+        specifier: ^22.0.0
+        version: 22.20.7
+      postgres:
+        specifier: ^3.4.0
+        version: 3.4.9
       typescript:
         specifier: ~5.9.0
         version: 5.9.3
@@ -600,6 +650,9 @@ packages:
     resolution: {integrity: sha512-AC/7JofJvZGrrneWNaEnJeOLUx+JlGt7tNa0wZiRPT4MY1wmfKjt2+6O2p2uz2+skll8OZZmJMNqeke7kKbNgQ==}
     hasBin: true
 
+  jose@6.2.18:
+    resolution: {integrity: sha512-doV4thUwgkrycJH4yLeqwTGIIZphHl+pk7CPReuMIhYhncmgzdko85MaCG4YQFTxqMFr1/oEH32tZuKKovcDEg==}
+
   lightningcss-android-arm64@1.33.0:
     resolution: {integrity: sha512-gEpRTalKdosp4Bb8qWtc2iOgE5SeIHlpS1up9bFq2wAyYhl1UdTObYiHe98zEM9SQvSoqQZ1IQD0JNpg3Ml5pg==}
     engines: {node: '>= 12.0.0'}
@@ -739,6 +792,10 @@ packages:
     resolution: {integrity: sha512-P1Qzj0XXZjMda74C7qiVnBG90UKNbyNUAOeQRBW8X63RsIMV57gevRqjnkELdwtZ/S2/uQFksJhmwuN8xShLPw==}
     engines: {node: ^10 || ^12 || >=14}
 
+  postgres@3.4.9:
+    resolution: {integrity: sha512-GD3qdB0x1z9xgFI6cdRD6xu2Sp2WCOEoe3mtnyB5Ee0XrrL5Pe+e4CCnJrRMnL1zYtRDZmQQVbvOttLnKDLnaw==}
+    engines: {node: '>=12'}
+
   react-dom@19.3.1:
     resolution: {integrity: sha512-Y0bARz53lhEC1NMCASs0/j+faB/zqt3R8hpvg1e8+61ZVJ4UL0UdC4cBbXfZMcIuhrfgeILTLe+ZeBCavQPtKQ==}
     peerDependencies:
@@ -760,6 +817,9 @@ packages:
     resolution: {integrity: sha512-9lpSSU4Mly3mrtruwLs1eLK6+gzbzqeBFwRNjIjE+9LuDpWdYctrQlQ3ej1Ilgi7gknpsTRnPoLP8DpCHqHIJw==}
     engines: {node: '>=10'}
     hasBin: true
+
+  server-only@0.0.1:
+    resolution: {integrity: sha512-qepMx2JxAa5jjfzxG79yPPq+8BuFToHd1hm7kI+Z4zAq1ftQiP7HcxMhDDItrbtwVeLg/cY2JnKnrcFkmiswNA==}
 
   sharp@0.35.5:
     resolution: {integrity: sha512-Ywn4OnzGukp7CDMrp08RQ50YKmuwG47brZgIVPTvBaaAfQlRlygrRqSrxdCiL9M+LlzLBiJ68IR1QqvzHyjC7g==}
@@ -1310,6 +1370,8 @@ snapshots:
 
   jiti@2.7.0: {}
 
+  jose@6.2.18: {}
+
   lightningcss-android-arm64@1.33.0:
     optional: true
 
@@ -1423,6 +1485,8 @@ snapshots:
       picocolors: 1.1.1
       source-map-js: 1.2.4
 
+  postgres@3.4.9: {}
+
   react-dom@19.3.1(react@19.3.1):
     dependencies:
       react: 19.3.1
@@ -1456,6 +1520,8 @@ snapshots:
 
   semver@7.8.6:
     optional: true
+
+  server-only@0.0.1: {}
 
   sharp@0.35.5(@types/node@22.20.7):
     dependencies:

@@ -17,7 +17,23 @@ const fail = (m) => { console.error(m); process.exit(1); };
 if (!/^https:\/\//.test(base)) fail("SING365_PUBLIC_URL must be an https:// URL (Office requires HTTPS).");
 if (!GUID.test(id)) fail("SING365_ADDIN_ID must be a GUID. Generate one once and keep it.");
 
+// Office SSO: needs ENTRA_CLIENT_ID and, in Entra, "Expose an API" with Application ID URI api://<host>/<client id>.
+const clientId = process.env.ENTRA_CLIENT_ID ?? (check ? "00000000-0000-4000-8000-000000000001" : "");
+if (clientId && !GUID.test(clientId)) fail("ENTRA_CLIENT_ID must be a GUID.");
+const host = new URL(base).host;
+const webAppInfo = clientId
+  ? `<WebApplicationInfo>
+        <Id>${clientId}</Id>
+        <Resource>api://${host}/${clientId}</Resource>
+        <Scopes>
+          <Scope>openid</Scope>
+          <Scope>profile</Scope>
+        </Scopes>
+      </WebApplicationInfo>`
+  : "";
+
 const xml = readFileSync(join(root, "manifest.template.xml"), "utf8")
+  .replaceAll("{{WEB_APP_INFO}}", webAppInfo)
   .replaceAll("{{BASE_URL}}", base)
   .replaceAll("{{APP_ID}}", id);
 

@@ -16,7 +16,11 @@
     "lucide-react": "^1.0.0",
     "next": "^16.0.0",
     "react": "^19.0.0",
-    "react-dom": "^19.0.0"
+    "react-dom": "^19.0.0",
+    "@sing365/db": "workspace:*",
+    "@sing365/graph": "workspace:*",
+    "jose": "^6.0.0",
+    "server-only": "^0.0.1"
   },
   "devDependencies": {
     "@tailwindcss/postcss": "^4.0.0",
@@ -25,6 +29,7 @@
     "@types/react-dom": "^19.0.0",
     "tailwindcss": "^4.0.0",
     "typescript": "~5.9.0",
-    "vitest": "^4.0.0"
+    "vitest": "^4.0.0",
+    "postgres": "^3.4.0"
   }
 }

@@ -2,7 +2,8 @@ import Link from "next/link";
 import { notFound } from "next/navigation";
 import { render } from "@sing365/render";
 import { Badge, Button, Card, PageHeader } from "@/components/ui";
-import { data, SEED_TENANT_ID } from "@/lib/data";
+import { data } from "@/lib/data";
+import { requirePanel } from "@/lib/context";
 import { buildSignature, fieldValues } from "@/lib/signature";
 
 export const metadata = { title: "İmza önizleme" };
@@ -24,21 +25,22 @@ export default async function SignaturePreview({
   params: Promise<{ id: string }>;
   searchParams: Promise<{ user?: string; mode?: string; to?: string }>;
 }) {
+  const { tenantId } = await requirePanel();
   const { id } = await params;
   const sp = await searchParams;
-  const template = await data.getTemplate(SEED_TENANT_ID, id);
+  const template = await data.getTemplate(tenantId, id);
   if (!template) notFound();
 
-  const users = await data.listUsers(SEED_TENANT_ID);
+  const users = await data.listUsers(tenantId);
   const user = users.find((u) => u.id === sp.user) ?? users[0];
   const mode = sp.mode === "reply" ? "reply" : "new";
   const to = sp.to ?? "musteri@baskafirma.com";
 
   const preview = user ? render(template.layout, fieldValues(user)) : null;
   const live = user
-    ? await buildSignature(data, { tenantId: SEED_TENANT_ID, from: user.email, mode, recipients: to.split(",").map((s) => s.trim()).filter(Boolean) })
+    ? await buildSignature(data, { tenantId: tenantId, from: user.email, mode, recipients: to.split(",").map((s) => s.trim()).filter(Boolean) })
     : null;
-  const templates = await data.listTemplates(SEED_TENANT_ID);
+  const templates = await data.listTemplates(tenantId);
   const nameOf = (tid: string | null) => templates.find((t) => t.id === tid)?.name ?? "imza yok";
 
   return (

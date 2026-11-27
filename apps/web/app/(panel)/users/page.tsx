@@ -1,10 +1,12 @@
 import { Badge, Card, EmptyState, PageHeader } from "@/components/ui";
-import { data, SEED_TENANT_ID } from "@/lib/data";
+import { data } from "@/lib/data";
+import { requirePanel } from "@/lib/context";
 
 export const metadata = { title: "Kişiler" };
 
 export default async function UsersPage() {
-  const [users, groups] = await Promise.all([data.listUsers(SEED_TENANT_ID), data.listGroups(SEED_TENANT_ID)]);
+  const { tenantId } = await requirePanel();
+  const [users, groups] = await Promise.all([data.listUsers(tenantId), data.listGroups(tenantId)]);
   const groupName = (id: string) => groups.find((g) => g.id === id)?.displayName ?? id;
   return (
     <>
