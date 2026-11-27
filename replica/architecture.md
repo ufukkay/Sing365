@@ -26,14 +26,16 @@ One database. No microservices beyond the relay, which has to be a separate proc
 
 ## How a signature reaches an email
 
-**Client-side (MVP).** Outlook add-in with event-based activation:
+> **Decision change (2026-11-27):** no Outlook add-in. Signatures are added server-side only, so mail sent from any device or app (phones included) gets one. The add-in code (`apps/addin`, `/api/addin/signature`) stays in the repo unused for now. How the relay works and how a customer sets up Exchange: `replica/relay.md`.
+
+**Client-side (dropped).** Outlook add-in with event-based activation:
 - `OnNewMessageCompose` / `OnNewAppointmentOrganizer`: call `GET /api/addin/signature?mode=new|reply&from=<address>`, then `body.setSignatureAsync(html)`; call `mailbox.item.disableClientSignatureAsync()` so the user's local signature does not stack.
 - `OnMessageRecipientsChanged`: re-evaluate when a rule depends on internal/external recipients.
 - `OnMessageFromChanged`: shared mailbox / send-as picks the mailbox's own signature.
 - Deployed by the customer's admin through Microsoft 365 admin center > Integrated apps (one manifest, all users).
 - The add-in caches the last HTML per (mode, template version) so compose works when the API is slow.
 
-**Server-side (phase 2).** Customer creates an outbound connector to `relay.<domain>` and a transport rule that routes mail from Sing365 users through it, skipping messages that carry the `X-Sing365-Signed` header (already signed by the add-in) or a loop header. The relay parses MIME, inserts the signature HTML (and a plain-text version) under the newest reply, and returns mail to Exchange through an inbound connector authenticated by certificate. It never stores message bodies; it only writes a `signature_events` row.
+**Server-side (the only delivery path).** Customer creates an outbound connector to `relay.<domain>` and a transport rule that routes mail from Sing365 users through it, skipping messages that carry the `X-Sing365-Signed` header (already signed by the add-in) or a loop header. The relay parses MIME, inserts the signature HTML (and a plain-text version) under the newest reply, and returns mail to Exchange through an inbound connector authenticated by certificate. It never stores message bodies; it only writes a `signature_events` row.
 
 ## Schema
 

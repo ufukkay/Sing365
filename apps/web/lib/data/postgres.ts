@@ -1,6 +1,7 @@
 import type { Layout } from "@sing365/render";
 import type { Rule } from "@sing365/rules";
 import type { Db } from "@sing365/db";
+import { newRelayKey, relayKeyHash } from "../relay-key";
 import type { DataLayer, DirectoryGroup, DirectoryUser, SyncStatus, Template, Tenant } from "./types";
 
 /** Postgres implementation of the DataLayer contract. Every tenant read goes through db.forTenant (RLS). */
@@ -91,6 +92,17 @@ export function postgresData(db: Db): DataLayer {
     async getTenantByEntraId(tid) {
       const [r] = await db.sql<TenantRow[]>`select id, entra_tenant_id, name, domains, deployment_mode, consent_status from tenants where entra_tenant_id = ${tid}`;
       return r ? toTenant(r) : null;
+    },
+    async getTenantByRelayKey(key) {
+      if (!key) return null;
+      const [r] = await db.sql<TenantRow[]>`select id, entra_tenant_id, name, domains, deployment_mode, consent_status from tenants
+        where relay_token_hash = ${relayKeyHash(key)}`;
+      return r ? toTenant(r) : null;
+    },
+    async createRelayKey(tenantId) {
+      const key = newRelayKey();
+      await db.sql`update tenants set relay_token_hash = ${relayKeyHash(key)} where id = ${tenantId}`;
+      return key;
     },
     async listUsers(tenantId, opts = {}) {
       const limit = Math.max(1, Math.min(5000, opts.limit ?? 500));

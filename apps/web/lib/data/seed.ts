@@ -1,5 +1,6 @@
 import type { Layout } from "@sing365/render";
 import type { Rule } from "@sing365/rules";
+import { newRelayKey, relayKeyHash } from "../relay-key";
 import type { DataLayer, DirectoryGroup, DirectoryUser, Template, Tenant } from "./types";
 
 /**
@@ -142,6 +143,8 @@ const rules: Rule[] = [
   { id: "r-all", templateId: "t-full", priority: 100, enabled: true, appliesTo: "both", senders: { all: true }, recipients: { scope: "any" } },
 ];
 
+const relayHashes = new Map<string, string>();
+
 const byTenant = <T,>(tenantId: string, rows: T[]): T[] => (tenantId === SEED_TENANT_ID ? rows : []);
 
 export const seedData: DataLayer = {
@@ -150,6 +153,14 @@ export const seedData: DataLayer = {
   },
   async getTenantByEntraId(tid) {
     return tid === tenant.entraTenantId ? tenant : null;
+  },
+  async getTenantByRelayKey(key) {
+    return key && relayHashes.get(tenant.id) === relayKeyHash(key) ? tenant : null;
+  },
+  async createRelayKey(tenantId) {
+    const key = newRelayKey();
+    relayHashes.set(tenantId, relayKeyHash(key));
+    return key;
   },
   async listUsers(tenantId, opts = {}) {
     const q = opts.q?.trim().toLocaleLowerCase("tr-TR");
