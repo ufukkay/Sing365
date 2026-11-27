@@ -46,11 +46,23 @@ describe.runIf(ADMIN_URL && APP_URL)("Postgres data layer + signature", () => {
     expect(r.ok && r.html).not.toContain("M ");
   });
 
+  it("searches, counts and lists people for pickers", async () => {
+    const data = postgresData(db);
+    expect((await data.listUsers(tenantId, { q: "ayş" })).map((u) => u.email)).toEqual(["ayse@data.com.tr"]);
+    expect(await data.listUsers(tenantId, { q: "AYSE@DATA" })).toHaveLength(1);
+    expect(await data.listUsers(tenantId, { q: "%" })).toEqual([]);
+    expect(await data.listUsers(tenantId, { q: "nobody" })).toEqual([]);
+    expect(await data.countUsers(tenantId)).toEqual({ total: 1, enabled: 1 });
+    expect(await data.listPeople(tenantId)).toEqual([{ id: expect.any(String), email: "ayse@data.com.tr", displayName: "Ayşe" }]);
+  });
+
   it("returns nothing for another tenant", async () => {
     const other = (await upsertTenantOnConsent(db, "44444444-4444-4444-8444-444444444444", "Diğer")).id;
     const data = postgresData(db);
     expect(await data.findUserByEmail(other, "ayse@data.com.tr")).toBeNull();
     expect(await data.listTemplates(other)).toEqual([]);
+    expect(await data.countUsers(other)).toEqual({ total: 0, enabled: 0 });
+    expect(await data.listPeople(other)).toEqual([]);
   });
 
   it("adds the starter signatures once; replies get the short one", async () => {

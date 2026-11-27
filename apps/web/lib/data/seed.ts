@@ -151,8 +151,21 @@ export const seedData: DataLayer = {
   async getTenantByEntraId(tid) {
     return tid === tenant.entraTenantId ? tenant : null;
   },
-  async listUsers(tenantId) {
-    return byTenant(tenantId, users);
+  async listUsers(tenantId, opts = {}) {
+    const q = opts.q?.trim().toLocaleLowerCase("tr-TR");
+    const rows = byTenant(tenantId, users).filter(
+      (u) => !q || u.displayName.toLocaleLowerCase("tr-TR").includes(q) || u.email.includes(q),
+    );
+    return rows.slice(0, opts.limit ?? 500);
+  },
+  async countUsers(tenantId) {
+    const rows = byTenant(tenantId, users);
+    return { total: rows.length, enabled: rows.filter((u) => u.accountEnabled).length };
+  },
+  async listPeople(tenantId) {
+    return byTenant(tenantId, users)
+      .filter((u) => u.accountEnabled)
+      .map((u) => ({ id: u.id, email: u.email, displayName: u.displayName }));
   },
   async getUser(tenantId, userId) {
     return byTenant(tenantId, users).find((u) => u.id === userId) ?? null;
