@@ -22,6 +22,9 @@ declare module "mailsplit" {
     encoding: string | false;
     disposition: string | false;
     multipart: string | false;
+    /** format=flowed, and its delsp=yes. */
+    flowed?: boolean;
+    delSp?: boolean;
     getHeaders(): Buffer;
     setCharset(charset: string): void;
   }

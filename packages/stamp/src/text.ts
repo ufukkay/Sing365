@@ -13,8 +13,9 @@ const REPLY_MARKERS: RegExp[] = [
   /^>/m,
 ];
 
-// Outlook for iOS/Android's own text signature.
-const MOBILE_SIGNATURE = /^Get Outlook for (?:iOS|Android)\s*(?:<[^>\r\n]*>)?[ \t]*$/m;
+// The line a phone's mail app adds by itself: Outlook for iOS/Android, and iPhone/iPad Mail in English and Turkish.
+const MOBILE_SIGNATURE =
+  /^(?:Get Outlook for (?:iOS|Android)\s*(?:<[^>\r\n]*>)?|Sent from my (?:iPhone|iPad)|(?:iPhone['’]umdan|iPad['’]imden) gönderildi)[ \t]*$/m;
 
 export function insertTextSignature(text: string, signature: string, reply: boolean): string {
   const nl = text.includes("\r\n") ? "\r\n" : "\n";
@@ -37,4 +38,23 @@ export function insertTextSignature(text: string, signature: string, reply: bool
   }
   const trailing = /(\r?\n)*$/.exec(text)?.[0] ?? "";
   return `${text.slice(0, text.length - trailing.length)}${nl}${nl}${sig}${nl}`;
+}
+
+/**
+ * Joins the soft line breaks of a format=flowed body (RFC 3676) into whole lines, so the text
+ * can be re-encoded without them. The signature separator "-- " is kept as a line of its own.
+ */
+export function unflow(text: string, delSp: boolean): string {
+  const nl = text.includes("\r\n") ? "\r\n" : "\n";
+  const out: string[] = [];
+  let open = false;
+  for (const raw of text.split(/\r?\n/)) {
+    const line = raw.startsWith(" ") ? raw.slice(1) : raw;
+    const soft = line.endsWith(" ") && line !== "-- ";
+    const piece = soft && delSp ? line.slice(0, -1) : line;
+    if (open) out[out.length - 1] += piece;
+    else out.push(piece);
+    open = soft;
+  }
+  return out.join(nl);
 }

@@ -47,8 +47,13 @@ function endOfDiv(html: string, start: number): number {
   return -1;
 }
 
+/** The wrapper every signature goes into, so it can be found again. */
+export function signatureBlock(signature: string): string {
+  return `<div class="sigwide-signature" style="margin:12px 0">${signature}</div>`;
+}
+
 export function insertHtmlSignature(html: string, signature: string, reply: boolean): { html: string; placement: Placement } {
-  const block = `<div class="sigwide-signature" style="margin:12px 0">${signature}</div>`;
+  const block = signatureBlock(signature);
   const quote = replyMarker(html);
 
   const mobile = MOBILE_SIGNATURE.exec(html);
@@ -62,4 +67,29 @@ export function insertHtmlSignature(html: string, signature: string, reply: bool
   const body = html.toLowerCase().lastIndexOf("</body>");
   if (body >= 0) return { html: html.slice(0, body) + block + html.slice(body), placement: "end" };
   return { html: html + block, placement: "end" };
+}
+
+function escapeText(s: string): string {
+  return s.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;");
+}
+
+function paragraph(text: string): string {
+  const body = text.replace(/^(?:[ \t]*\r?\n)+|(?:\r?\n[ \t]*)+$/g, "");
+  if (!body) return "";
+  const lines = body.split(/\r?\n/).map((l) => escapeText(l).replace(/^ +/, (s) => "&nbsp;".repeat(s.length)));
+  return `<div style="font-family:Arial,Helvetica,sans-serif;font-size:14px;line-height:1.4">${lines.join("<br>\n")}</div>`;
+}
+
+/**
+ * An HTML version of a plain-text message, with the HTML signature where the text signature
+ * would go. `before` and `after` are the text on either side of that spot.
+ */
+export function textToHtml(before: string, signature: string, after: string): string {
+  return [
+    '<html><head><meta http-equiv="Content-Type" content="text/html; charset=utf-8"></head><body>',
+    paragraph(before),
+    signatureBlock(signature),
+    paragraph(after),
+    "</body></html>",
+  ].join("\n");
 }
