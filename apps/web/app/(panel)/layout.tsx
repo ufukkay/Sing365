@@ -1,12 +1,15 @@
 import { CircleCheck } from "lucide-react";
 import { Sidebar } from "@/components/sidebar";
 import { Badge } from "@/components/ui";
-import { data, SEED_TENANT_ID } from "@/lib/data";
+import { data } from "@/lib/data";
+import { requirePanel } from "@/lib/context";
+
+export const dynamic = "force-dynamic";
 
 export default async function PanelLayout({ children }: { children: React.ReactNode }) {
-  // TODO(replica-backend): the tenant comes from the signed-in admin's session.
-  const tenant = await data.getTenant(SEED_TENANT_ID);
-  const sync = await data.getSyncStatus(SEED_TENANT_ID);
+  const { tenantId, session } = await requirePanel();
+  const tenant = await data.getTenant(tenantId);
+  const sync = await data.getSyncStatus(tenantId);
   return (
     <div className="grid min-h-screen grid-rows-[56px_auto_1fr] lg:grid-rows-[56px_1fr] lg:grid-cols-[248px_1fr]">
       <header className="col-span-full flex items-center gap-4 border-b border-border bg-bg px-4">
@@ -15,13 +18,29 @@ export default async function PanelLayout({ children }: { children: React.ReactN
         </a>
         <span className="text-lg font-bold text-accent">Sing365</span>
         <span className="truncate text-sm text-text-muted">{tenant?.name}</span>
-        <span className="ml-auto">
+        <span className="ml-auto flex items-center gap-2">
+          {session && (
+            <form action="/api/sync" method="post">
+              <button type="submit" className="rounded-md px-2 py-1 text-xs font-medium text-accent hover:bg-accent-subtle">
+                Şimdi senkronla
+              </button>
+            </form>
+          )}
           {sync.state === "succeeded" ? (
             <Badge tone="success" icon={<CircleCheck aria-hidden className="size-3" />}>
               Dizin senkron
             </Badge>
+          ) : sync.state === "failed" ? (
+            <Badge tone="danger">Senkron hatası</Badge>
           ) : (
             <Badge tone="warning">Senkron bekliyor</Badge>
+          )}
+          {session && (
+            <form action="/api/auth/signout" method="post">
+              <button type="submit" className="rounded-md px-2 py-1 text-xs text-text-muted hover:bg-surface" title={session.email}>
+                Çıkış
+              </button>
+            </form>
           )}
         </span>
       </header>

@@ -1,6 +1,7 @@
 import Link from "next/link";
 import { Badge, Card, EmptyState, PageHeader } from "@/components/ui";
-import { data, SEED_TENANT_ID } from "@/lib/data";
+import { data } from "@/lib/data";
+import { requirePanel } from "@/lib/context";
 
 export const metadata = { title: "İmzalar" };
 
@@ -8,7 +9,8 @@ const fmt = (iso: string) =>
   new Intl.DateTimeFormat("tr-TR", { dateStyle: "medium", timeStyle: "short", timeZone: "Europe/Istanbul" }).format(new Date(iso));
 
 export default async function SignaturesPage() {
-  const [templates, rules] = await Promise.all([data.listTemplates(SEED_TENANT_ID), data.listRules(SEED_TENANT_ID)]);
+  const { tenantId } = await requirePanel();
+  const [templates, rules] = await Promise.all([data.listTemplates(tenantId), data.listRules(tenantId)]);
   const signatures = templates.filter((t) => t.kind === "signature");
   const priorityOf = (id: string) => Math.min(...rules.filter((r) => r.templateId === id).map((r) => r.priority));
 

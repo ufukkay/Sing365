@@ -1,6 +1,7 @@
 import Link from "next/link";
 import { Card, PageHeader, StatTile, Badge } from "@/components/ui";
-import { data, SEED_TENANT_ID } from "@/lib/data";
+import { data } from "@/lib/data";
+import { requirePanel } from "@/lib/context";
 
 export const metadata = { title: "Genel bakış" };
 
@@ -8,11 +9,12 @@ const fmt = (iso: string | null) =>
   iso ? new Intl.DateTimeFormat("tr-TR", { dateStyle: "medium", timeStyle: "short", timeZone: "Europe/Istanbul" }).format(new Date(iso)) : "hiç";
 
 export default async function Dashboard() {
+  const { tenantId } = await requirePanel();
   const [tenant, users, templates, sync] = await Promise.all([
-    data.getTenant(SEED_TENANT_ID),
-    data.listUsers(SEED_TENANT_ID),
-    data.listTemplates(SEED_TENANT_ID),
-    data.getSyncStatus(SEED_TENANT_ID),
+    data.getTenant(tenantId),
+    data.listUsers(tenantId),
+    data.listTemplates(tenantId),
+    data.getSyncStatus(tenantId),
   ]);
   const published = templates.filter((t) => t.status === "published").length;
   const mode = { client: "Outlook eklentisi", server: "Sunucu tarafı", both: "Eklenti + sunucu" }[tenant?.deploymentMode ?? "client"];

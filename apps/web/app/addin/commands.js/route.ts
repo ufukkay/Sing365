@@ -25,6 +25,17 @@ function sing365Recipients(item) {
     });
 }
 
+/* Office SSO token for the Sing365 API (manifest WebApplicationInfo). No prompt during compose. */
+function sing365Token() {
+  try {
+    if (typeof OfficeRuntime !== "undefined" && OfficeRuntime.auth && OfficeRuntime.auth.getAccessToken) {
+      return OfficeRuntime.auth.getAccessToken({ allowSignInPrompt: false, allowConsentPrompt: false })
+        .catch(function () { return null; });
+    }
+  } catch (e) {}
+  return Promise.resolve(null);
+}
+
 function sing365Insert(event) {
   var item = Office.context.mailbox.item;
   var done = function () { try { event.completed(); } catch (e) {} };
@@ -41,8 +52,10 @@ function sing365Insert(event) {
       var mode = v[1] === "reply" || v[1] === "forward" ? "reply" : "new";
       var url = SING365_API + "/api/addin/signature?mode=" + mode +
         "&from=" + encodeURIComponent(from) + "&to=" + encodeURIComponent(v[2].join(","));
-      // TODO(replica-backend): attach the Nested App Authentication access token.
-      return fetch(url, { credentials: "omit" });
+      return sing365Token().then(function (token) {
+        var headers = token ? { Authorization: "Bearer " + token } : {};
+        return fetch(url, { credentials: "omit", headers: headers });
+      });
     })
     .then(function (res) { return res.ok ? res.json() : null; })
     .then(function (sig) {

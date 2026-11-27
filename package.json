@@ -5,9 +5,11 @@
   "scripts": {
     "dev": "pnpm --filter @sing365/web dev",
     "build": "pnpm -r build",
-    "test": "pnpm -r test",
+    "test": "pnpm -r --workspace-concurrency=1 test",
     "typecheck": "pnpm -r typecheck",
     "manifest": "node apps/addin/scripts/build-manifest.mjs"
   },
-  "engines": { "node": ">=20" }
+  "engines": {
+    "node": ">=20"
+  }
 }

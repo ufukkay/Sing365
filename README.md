@@ -24,6 +24,6 @@ pnpm test                             # rule engine, renderer, signature service
 SING365_URL=http://localhost:3000 node apps/addin/test/commands.sim.mjs   # simulated Outlook compose
 ```
 
-Layout: `apps/web` (Next.js panel + add-in API), `apps/addin` (Outlook manifest), `packages/rules` (who gets which signature), `packages/render` (email-safe HTML). Data is seed data until `/replica-backend`.
+Layout: `apps/web` (Next.js panel + add-in API), `apps/addin` (Outlook manifest), `packages/rules` (who gets which signature), `packages/render` (email-safe HTML), `packages/db` (Postgres, migrations, RLS), `packages/graph` (Microsoft Graph directory sync). Without `DATABASE_URL` the panel runs on seed data; with it, sign-in through Microsoft Entra is required. Setup and the security checklist: `replica/backend.md`. Copy `.env.example` to `apps/web/.env.local`.
 
 To sideload the add-in you need an HTTPS URL: `SING365_PUBLIC_URL=https://... SING365_ADDIN_ID=<guid> pnpm manifest`, then upload `apps/addin/dist/manifest.xml` in Outlook > Get Add-ins > My add-ins.

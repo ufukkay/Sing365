@@ -5,6 +5,13 @@ import { buildSignature } from "@/lib/signature";
 
 export const dynamic = "force-dynamic";
 
+// Classic Outlook on Windows runs the add-in script outside our origin; the API is token-authenticated, never cookie-authenticated.
+const CORS = { "Access-Control-Allow-Origin": "*", "Access-Control-Allow-Headers": "Authorization", "Vary": "Origin" };
+
+export function OPTIONS() {
+  return new Response(null, { status: 204, headers: { ...CORS, "Access-Control-Allow-Methods": "GET" } });
+}
+
 const EMAIL = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 
 /**
@@ -22,16 +29,16 @@ export async function GET(req: Request) {
     .filter((s) => EMAIL.test(s))
     .slice(0, 500);
 
-  if (!EMAIL.test(from)) return NextResponse.json({ error: "invalid_from" }, { status: 400 });
+  if (!EMAIL.test(from)) return NextResponse.json({ error: "invalid_from" }, { status: 400, headers: CORS });
 
-  const caller = authenticateAddin(req, from);
-  if (!caller) return NextResponse.json({ error: "unauthorized" }, { status: 401 });
+  const caller = await authenticateAddin(req, from);
+  if (!caller) return NextResponse.json({ error: "unauthorized" }, { status: 401, headers: CORS });
 
   const result = await buildSignature(data, { tenantId: caller.tenantId, from, mode, recipients });
-  if (!result.ok) return NextResponse.json({ error: result.reason }, { status: 404 });
+  if (!result.ok) return NextResponse.json({ error: result.reason }, { status: 404, headers: CORS });
 
   return NextResponse.json(
     { html: result.html, text: result.text, templateId: result.templateId, version: result.version },
-    { headers: { "Cache-Control": "no-store" } },
+    { headers: { "Cache-Control": "no-store", ...CORS } },
   );
 }

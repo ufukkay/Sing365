@@ -1,6 +1,6 @@
 feature,area,priority,original,clone,notes
-Admin signs in with Microsoft Entra ID and grants tenant consent,onboarding,must,yes,no,multi-tenant app; Graph User.Read.All / Directory.Read.All
-Sync users and groups from Entra ID via Graph,directory,must,yes,no,scheduled delta sync
+Admin signs in with Microsoft Entra ID and grants tenant consent,onboarding,must,yes,yes,"OIDC + PKCE sign-in, /adminconsent flow; not yet tried against a real tenant"
+Sync users and groups from Entra ID via Graph,directory,must,yes,yes,"delta sync users + groups + memberships, cron every 4h; fake-Graph integration tests"
 Directory placeholders in templates (name title phone dept photo),designer,must,yes,yes,renderer + seed data; real Graph data in replica-backend
 Hide a line when its field is empty,designer,must,yes,yes,"packages/render, tested"
 Drag-and-drop signature designer producing email-safe HTML,designer,must,yes,partial,email-safe renderer done; drag-and-drop editor not built
@@ -11,7 +11,7 @@ Different signature for new mail vs reply,rules,must,yes,partial,engine + add-in
 Internal vs external recipient rules,rules,must,yes,partial,engine + add-in recipients; no UI
 Rule priority / order,rules,must,yes,partial,engine; no reorder UI
 Legal disclaimer,disclaimers,must,yes,no,
-Outlook add-in that inserts signature automatically on compose,delivery-client,must,yes,partial,"manifest + event script, simulated end to end; not yet tried in real Outlook; token auth pending"
+Outlook add-in that inserts signature automatically on compose,delivery-client,must,yes,partial,SSO token auth added; needs Expose an API + real Outlook test
 Add-in works on Outlook web Windows Mac and mobile,delivery-client,must,yes,no,
 Brand kit (logo colours social links),brand,must,yes,no,
 Billing per active mailbox with free trial,billing,must,yes,no,Stripe

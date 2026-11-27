@@ -81,6 +81,7 @@
           <bt:Url id="Commands.Url" DefaultValue="{{BASE_URL}}/addin/commands.js" />
         </bt:Urls>
       </Resources>
+      {{WEB_APP_INFO}}
     </VersionOverrides>
   </VersionOverrides>
 </OfficeApp>
