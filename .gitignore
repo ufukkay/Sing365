@@ -7,3 +7,6 @@ coverage/
 apps/addin/dist/
 *.tsbuildinfo
 test-results/
+
+# local development database (pnpm dev:local)
+.local-db/

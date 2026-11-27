@@ -4,6 +4,7 @@
   "packageManager": "pnpm@10.28.0",
   "scripts": {
     "dev": "pnpm --filter @sing365/web dev",
+    "dev:local": "node scripts/dev-local.mjs",
     "build": "pnpm -r build",
     "test": "pnpm -r --workspace-concurrency=1 test",
     "typecheck": "pnpm -r typecheck",
@@ -11,5 +12,8 @@
   },
   "engines": {
     "node": ">=20"
+  },
+  "devDependencies": {
+    "embedded-postgres": "17.12.0-beta.19"
   }
 }
