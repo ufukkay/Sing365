@@ -1,7 +1,8 @@
 import Link from "next/link";
-import { Badge, Card, EmptyState, PageHeader } from "@/components/ui";
+import { Badge, Button, Card, EmptyState, PageHeader } from "@/components/ui";
 import { data } from "@/lib/data";
 import { requirePanel } from "@/lib/context";
+import { addStarterTemplatesAction } from "./actions";
 
 export const metadata = { title: "İmzalar" };
 
@@ -19,10 +20,26 @@ export default async function SignaturesPage() {
       <PageHeader
         title="İmzalar"
         description="Kurallar öncelik sırasıyla çalışır: bir gönderen için eşleşen ilk kural imzayı belirler."
+        actions={
+          <Link
+            href="/signatures/new"
+            className="inline-flex h-9 items-center rounded-md border border-border bg-surface-raised px-4 text-sm font-semibold text-text hover:bg-surface"
+          >
+            HTML'den imza ekle
+          </Link>
+        }
       />
       <Card>
         {signatures.length === 0 ? (
-          <EmptyState title="Henüz imza yok" body="İlk imzanızı oluşturun; dizindeki bilgiler otomatik dolar." />
+          <EmptyState
+            title="Henüz imza yok"
+            body="Hazır iki imzayla başlayın: yeni e-postalar için kurumsal imza, yanıtlar için kısa imza. Ad, unvan ve telefon gibi bilgiler her kişi için dizinden otomatik dolar."
+            action={
+              <form action={addStarterTemplatesAction}>
+                <Button type="submit">Hazır imzaları ekle</Button>
+              </form>
+            }
+          />
         ) : (
           <div className="overflow-x-auto">
             <table className="w-full text-left text-sm">

@@ -17,7 +17,7 @@ import { GraphClient, GraphError } from "./client";
 const USER_FIELDS = [
   "id", "mail", "userPrincipalName", "proxyAddresses", "displayName", "givenName", "surname", "jobTitle",
   "department", "companyName", "officeLocation", "businessPhones", "mobilePhone", "streetAddress", "city",
-  "country", "accountEnabled", "userType", "onPremisesExtensionAttributes", "assignedLicenses",
+  "state", "postalCode", "country", "accountEnabled", "userType", "onPremisesExtensionAttributes", "assignedLicenses",
 ];
 
 export const USERS_DELTA_START = `/users/delta?$select=${USER_FIELDS.join(",")}`;
@@ -39,6 +39,8 @@ export interface GraphUser {
   mobilePhone?: string | null;
   streetAddress?: string | null;
   city?: string | null;
+  state?: string | null;
+  postalCode?: string | null;
   country?: string | null;
   accountEnabled?: boolean | null;
   userType?: string | null;
@@ -86,6 +88,8 @@ export function mapUser(u: GraphUser): DirectoryUserInput | null {
     mobilePhone: clean(u.mobilePhone),
     streetAddress: clean(u.streetAddress),
     city: clean(u.city),
+    state: clean(u.state),
+    postalCode: clean(u.postalCode),
     country: clean(u.country),
     managerEntraId: null,
     extensionAttrs: ext,
