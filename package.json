@@ -1,0 +1,13 @@
+{
+  "name": "sing365",
+  "private": true,
+  "packageManager": "pnpm@10.28.0",
+  "scripts": {
+    "dev": "pnpm --filter @sing365/web dev",
+    "build": "pnpm -r build",
+    "test": "pnpm -r test",
+    "typecheck": "pnpm -r typecheck",
+    "manifest": "node apps/addin/scripts/build-manifest.mjs"
+  },
+  "engines": { "node": ">=20" }
+}
