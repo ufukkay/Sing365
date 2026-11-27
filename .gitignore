@@ -10,3 +10,6 @@ test-results/
 
 # local development database (pnpm dev:local)
 .local-db/
+
+# deploy/install.sh output on the server
+deploy/install.log
