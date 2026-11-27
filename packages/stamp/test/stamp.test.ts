@@ -169,11 +169,80 @@ describe("stampMessage", () => {
     expect(m.text).toBe("Selam\n\nUfuk KAYA\nKıdemli Uzman\n");
   });
 
-  it("signs a plain-text-only message", async () => {
-    const raw = message([...FROM, "Subject: Not", "Content-Type: text/plain; charset=us-ascii", "Content-Transfer-Encoding: 7bit"], "Kisa not.\r\n");
+  it("turns a plain-text-only message into text plus HTML so the HTML signature shows", async () => {
+    const raw = message([...FROM, "Subject: Not", "Content-Type: text/plain; charset=us-ascii", "Content-Transfer-Encoding: 7bit"], "Kisa not.\r\n<b>degil</b>\r\n");
     const r = await stampMessage(raw, sign);
+    expect(r.status === "signed" && r.placement).toBe("converted-to-html");
+    const m = await simpleParser(r.raw);
+    expect(m.text).toBe("Kisa not.\n<b>degil</b>\n\nUfuk KAYA\nKıdemli Uzman\n");
+    expect(m.html).toContain("Kisa not.<br>\n&lt;b&gt;degil&lt;/b&gt;</div>");
+    expect(m.html).toContain('<div class="sigwide-signature" style="margin:12px 0"><table data-sigwide="1">');
+    expect(m.headers.get("x-sigwide-signed")).toBe("1");
+    expect(m.headers.get("subject")).toBe("Not");
+  });
+
+  it("keeps a plain-text message plain when the signature has no HTML", async () => {
+    const raw = message([...FROM, "Subject: Not", "Content-Type: text/plain; charset=us-ascii"], "Kisa not.\r\n");
+    const r = await stampMessage(raw, async () => ({ html: "", text: SIG.text }));
     expect(r.status === "signed" && r.placement).toBe("text-only");
-    expect((await simpleParser(r.raw)).text).toBe("Kisa not.\n\nUfuk KAYA\nKıdemli Uzman\n");
+    const m = await simpleParser(r.raw);
+    expect(m.html).toBe(false);
+    expect(m.text).toBe("Kisa not.\n\nUfuk KAYA\nKıdemli Uzman\n");
+  });
+
+  it("replaces iPhone Mail's own line in a flowed plain-text mail from a phone", async () => {
+    const raw = message(
+      [...FROM, "Subject: Yoldayim", "Content-Type: text/plain; charset=utf-8; format=flowed; delsp=yes", "Content-Transfer-Encoding: quoted-printable"],
+      // A soft break: the line ends in a space (encoded =20, as quoted-printable needs), plus one for delsp.
+      qp("Merhaba, yarinki toplantiyi bir saat erteleyebilir miyiz? Trafik ") + "=20\r\n" + qp("cok yogun.\r\n\r\niPhone\u2019umdan g\u00f6nderildi\r\n"),
+    );
+    const r = await stampMessage(raw, sign);
+    expect(r.status === "signed" && r.placement).toBe("converted-to-html");
+    const m = await simpleParser(r.raw);
+    expect(m.text).toBe("Merhaba, yarinki toplantiyi bir saat erteleyebilir miyiz? Trafik cok yogun.\n\nUfuk KAYA\nKıdemli Uzman\n");
+    expect(m.html).not.toContain("gönderildi");
+    expect(m.html).toContain("Trafik cok yogun.</div>");
+  });
+
+  it("signs a plain-text reply above the quoted lines in both versions", async () => {
+    const raw = message(
+      [...FROM, "Subject: Re: Teklif", "In-Reply-To: <a@b>", "Content-Type: text/plain; charset=utf-8"],
+      "Tamam.\r\n\r\nOn Fri, 27 Nov 2026 at 20:00, Ali <ali@x.com> wrote:\r\n> Teklif ektedir.\r\n",
+    );
+    const r = await stampMessage(raw, sign);
+    const m = await simpleParser(r.raw);
+    expect(m.text).toBe("Tamam.\n\nUfuk KAYA\nKıdemli Uzman\n\nOn Fri, 27 Nov 2026 at 20:00, Ali <ali@x.com> wrote:\n> Teklif ektedir.\n");
+    const html = String(m.html);
+    expect(html.indexOf("Tamam.")).toBeLessThan(html.indexOf("sigwide-signature"));
+    expect(html.indexOf("sigwide-signature")).toBeLessThan(html.indexOf("&gt; Teklif ektedir."));
+  });
+
+  it("converts the text body of a mail with an attachment and leaves the attachment alone", async () => {
+    const pdf = Buffer.from(Array.from({ length: 2000 }, (_, i) => i % 251));
+    const raw = message(
+      [...FROM, "Subject: Fatura", 'Content-Type: multipart/mixed; boundary="mix"'],
+      [
+        "--mix",
+        "Content-Type: text/plain; charset=utf-8",
+        "",
+        "Fatura ektedir.",
+        "--mix",
+        'Content-Type: application/pdf; name="fatura.pdf"',
+        'Content-Disposition: attachment; filename="fatura.pdf"',
+        "Content-Transfer-Encoding: base64",
+        "",
+        pdf.toString("base64").replace(/.{76}/g, "$&\r\n"),
+        "--mix--",
+        "",
+      ].join("\r\n"),
+    );
+    const r = await stampMessage(raw, sign);
+    const m = await simpleParser(r.raw);
+    expect(m.text).toBe("Fatura ektedir.\n\nUfuk KAYA\nKıdemli Uzman\n");
+    expect(m.html).toContain("Fatura ektedir.</div>");
+    expect(m.html).toContain("sigwide-signature");
+    const att = m.attachments.find((a) => a.filename === "fatura.pdf");
+    expect(createHash("sha256").update(att!.content).digest("hex")).toBe(createHash("sha256").update(pdf).digest("hex"));
   });
 
   it("leaves attachments and forwarded messages byte-for-byte as they were", async () => {

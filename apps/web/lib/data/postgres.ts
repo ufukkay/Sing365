@@ -73,6 +73,7 @@ interface TenantRow {
   domains: string[];
   deployment_mode: Tenant["deploymentMode"];
   consent_status: Tenant["consentStatus"];
+  relay_key_set: boolean;
 }
 const toTenant = (r: TenantRow): Tenant => ({
   id: r.id,
@@ -81,21 +82,22 @@ const toTenant = (r: TenantRow): Tenant => ({
   domains: r.domains ?? [],
   deploymentMode: r.deployment_mode,
   consentStatus: r.consent_status,
+  relayKeySet: r.relay_key_set,
 });
 
 export function postgresData(db: Db): DataLayer {
   return {
     async getTenant(id) {
-      const [r] = await db.sql<TenantRow[]>`select id, entra_tenant_id, name, domains, deployment_mode, consent_status from tenants where id = ${id}`;
+      const [r] = await db.sql<TenantRow[]>`select id, entra_tenant_id, name, domains, deployment_mode, consent_status, relay_token_hash is not null as relay_key_set from tenants where id = ${id}`;
       return r ? toTenant(r) : null;
     },
     async getTenantByEntraId(tid) {
-      const [r] = await db.sql<TenantRow[]>`select id, entra_tenant_id, name, domains, deployment_mode, consent_status from tenants where entra_tenant_id = ${tid}`;
+      const [r] = await db.sql<TenantRow[]>`select id, entra_tenant_id, name, domains, deployment_mode, consent_status, relay_token_hash is not null as relay_key_set from tenants where entra_tenant_id = ${tid}`;
       return r ? toTenant(r) : null;
     },
     async getTenantByRelayKey(key) {
       if (!key) return null;
-      const [r] = await db.sql<TenantRow[]>`select id, entra_tenant_id, name, domains, deployment_mode, consent_status from tenants
+      const [r] = await db.sql<TenantRow[]>`select id, entra_tenant_id, name, domains, deployment_mode, consent_status, relay_token_hash is not null as relay_key_set from tenants
         where relay_token_hash = ${relayKeyHash(key)}`;
       return r ? toTenant(r) : null;
     },

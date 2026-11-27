@@ -2,13 +2,14 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { BarChart3, LayoutDashboard, Megaphone, PenLine, Settings, Users } from "lucide-react";
+import { BarChart3, LayoutDashboard, Megaphone, PenLine, Plug, Settings, Users } from "lucide-react";
 import { cx } from "./ui";
 
 const nav = [
   { href: "/", label: "Genel bakış", icon: LayoutDashboard },
   { href: "/signatures", label: "İmzalar", icon: PenLine },
   { href: "/users", label: "Kişiler", icon: Users },
+  { href: "/exchange", label: "Exchange bağlantısı", icon: Plug },
   { href: "/campaigns", label: "Kampanyalar", icon: Megaphone, soon: true },
   { href: "/analytics", label: "Analiz", icon: BarChart3, soon: true },
   { href: "/settings", label: "Ayarlar", icon: Settings, soon: true },

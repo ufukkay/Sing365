@@ -5,6 +5,12 @@
 	key_type rsa2048
 }
 
+# The public page on the bare domain and www.
+{$SIGWIDE_SITE_HOST} www.{$SIGWIDE_SITE_HOST} {
+	root * /srv/site
+	file_server
+}
+
 # The panel.
 {$SIGWIDE_HOST} {
 	encode zstd gzip

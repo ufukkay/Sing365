@@ -17,7 +17,7 @@ export default async function Dashboard() {
     data.getSyncStatus(tenantId),
   ]);
   const published = templates.filter((t) => t.status === "published").length;
-  const mode = { client: "Outlook eklentisi", server: "Sunucu tarafı", both: "Eklenti + sunucu" }[tenant?.deploymentMode ?? "client"];
+  const mode = tenant?.relayKeySet ? "Sunucu tarafı" : "Kurulmadı";
 
   return (
     <>
@@ -26,7 +26,11 @@ export default async function Dashboard() {
         <StatTile label="Aktif posta kutusu" value={counts.enabled.toLocaleString("tr-TR")} note="faturalanan kişi sayısı" />
         <StatTile label="Yayındaki imza" value={published} note={`${templates.length - published} taslak`} />
         <StatTile label="Son senkron" value={<span className="text-base">{fmt(sync.finishedAt)}</span>} note={`${sync.usersChanged} kişi güncellendi`} />
-        <StatTile label="Dağıtım" value={<span className="text-base">{mode}</span>} note={<Badge tone="accent">aktif</Badge>} />
+        <StatTile
+          label="Dağıtım"
+          value={<span className="text-base">{mode}</span>}
+          note={tenant?.relayKeySet ? <Badge tone="accent">röle anahtarı var</Badge> : <Link className="text-accent underline" href="/exchange">Exchange bağlantısı</Link>}
+        />
       </div>
       <Card title="Sıradaki adımlar" className="mt-6">
         <ol className="list-decimal space-y-2 pl-5 text-sm">
@@ -36,7 +40,12 @@ export default async function Dashboard() {
             </Link>{" "}
             ve kimin hangi imzayı aldığını kontrol edin.
           </li>
-          <li>Outlook eklentisini Microsoft 365 yönetim merkezi › Entegre uygulamalar üzerinden dağıtın.</li>
+          <li>
+            <Link className="font-medium text-accent underline" href="/exchange">
+              Exchange bağlantısını kurun
+            </Link>{" "}
+            ve imzayı önce bir test grubunda deneyin.
+          </li>
           <li>Kampanya bannerlarını planlayın (yakında).</li>
         </ol>
       </Card>

@@ -50,11 +50,11 @@ Host requirements: a fixed public host name with a publicly trusted certificate;
 
 Follows Microsoft's "Integrate Exchange Online with an email add-on service" scenario.
 
-1. Panel: create the tenant's relay key (shown once). *(Panel page still to build.)*
+1. Panel › Exchange bağlantısı: create the tenant's relay key (shown once); the page also writes the PowerShell for steps 3 to 5.
 2. The relay's certificate name (e.g. `relay.talay.com`, 48 characters or less) must be an **accepted domain** of the tenant (Microsoft 365 admin center › Domains, verified by TXT). A subdomain of an already verified domain is quick.
 3. Exchange admin center › Mail flow › Connectors › add **outbound**: from Office 365 to *your organization's email server*, name "Sigwide", use only when a transport rule redirects messages to it, smart host = relay host name, always use TLS with a certificate issued by a trusted CA whose name matches the smart host, keep internal Exchange headers.
    `New-OutboundConnector -Name Sigwide -ConnectorType OnPremises -IsTransportRuleScoped $true -UseMxRecord $false -SmartHosts <relay host> -TlsSettings DomainValidation -TlsDomain <relay host> -CloudServicesMailEnabled $true`
-4. Add **inbound**: from your organization's email server to Office 365, identified by the certificate name = relay host name.
-   `New-InboundConnector -Name Sigwide -ConnectorType OnPremises -SenderDomains * -RequireTls $true -RestrictDomainsToCertificate $true -TlsSenderCertificateName <relay host> -CloudServicesMailEnabled $true`
-5. Mail flow › Rules › new rule "Sigwide imza": apply if the sender is a member of "Sigwide Test"; actions: set message header `X-Sigwide-Key` to the key, and redirect the message to the "Sigwide" connector; except if message header `X-Sigwide-Signed` includes `1` or `skipped` (the loop guard); stop processing more rules.
+4. Add **inbound**: from your organization's email server to Office 365, identified by the certificate name = relay host name. Give it a different name from the outbound connector: Exchange keeps both in one container and refuses a duplicate name.
+   `New-InboundConnector -Name "Sigwide geri donus" -ConnectorType OnPremises -SenderDomains * -RequireTls $true -TlsSenderCertificateName <relay host> -CloudServicesMailEnabled $true`
+5. Mail flow › Rules › new rule "Sigwide imza": apply if the sender is one test person (`-From`) or a member of a mail-enabled test group (`-FromMemberOf`); actions: set message header `X-Sigwide-Key` to the key, and redirect the message to the "Sigwide" connector; except if message header `X-Sigwide-Signed` includes `1` or `skipped` (the loop guard); stop processing more rules.
 6. Send a test mail; widen the group when it looks right.

@@ -16,6 +16,8 @@ export interface Tenant {
   domains: string[];
   deploymentMode: DeploymentMode;
   consentStatus: "pending" | "granted" | "revoked";
+  /** Whether a relay key exists (the key itself is stored only as a hash). */
+  relayKeySet: boolean;
 }
 
 export interface DirectoryUser {

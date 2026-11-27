@@ -134,7 +134,8 @@ describe("relay", () => {
     expect(m.text).toBe("Merhaba,\nTeklif ektedir.\n\nUfuk KAYA\nKıdemli Uzman\n");
     expect(m.headers.get("x-sigwide-signed")).toBe("1");
     expect(m.headers.has("x-sigwide-key")).toBe(false);
-    expect(logs).toEqual([expect.objectContaining({ status: "signed", placement: "text-only", mode: "new" })]);
+    expect(logs).toEqual([expect.objectContaining({ status: "signed", placement: "converted-to-html", mode: "new" })]);
+    expect(m.html).toContain("<b>Ufuk KAYA</b>");
     // No addresses in the log.
     expect(JSON.stringify(logs)).not.toMatch(/@/);
   });

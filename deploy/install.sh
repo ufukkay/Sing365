@@ -2,9 +2,10 @@
 # Installs or updates Sigwide on a fresh Ubuntu server with Docker. Run as root:
 #   bash <(curl -fsSL https://raw.githubusercontent.com/ufukkay/Sing365/main/deploy/install.sh)
 # Running it again pulls the latest code and restarts what changed. Settings live in /opt/sigwide/deploy/.env.
-# The first run asks for the settings; SIGWIDE_HOST, SIGWIDE_RELAY_HOST and ENTRA_CLIENT_ID can be given as
+# The first run asks for the settings; SIGWIDE_HOST, SIGWIDE_RELAY_HOST, SIGWIDE_SITE_HOST (the public page,
+# default: the panel's parent domain) and ENTRA_CLIENT_ID can be given as
 # environment variables instead. The Entra client secret is always typed at the prompt, never on the command line.
-# Both host names need DNS A records pointing at this server before the first run (for the HTTPS certificates).
+# All host names (and www.<site>) need DNS A records pointing at this server (for the HTTPS certificates).
 set -euo pipefail
 
 REPO="${SIGWIDE_REPO:-https://github.com/ufukkay/Sing365.git}"
@@ -38,6 +39,7 @@ if [ ! -f .env ]; then
   [ -n "$host" ] || read -rp "Panelin adresi (örn. app.alanadi.com): " host </dev/tty
   [ -n "$relay_host" ] || read -rp "Posta rölesinin adresi (örn. relay.alanadi.com): " relay_host </dev/tty
   [ -n "$client_id" ] || read -rp "Entra uygulama (client) kimliği: " client_id </dev/tty
+  site_host="${SIGWIDE_SITE_HOST:-${host#*.}}"
   read -rsp "Entra istemci gizli anahtarı (sağ tık > Yapıştır; ekranda görünmez, bitince Enter): " client_secret </dev/tty
   echo
   # A web terminal can slip control characters into a paste (Ctrl+V); Entra secrets use only these characters.
@@ -47,6 +49,7 @@ if [ ! -f .env ]; then
   cat > .env <<ENV
 SIGWIDE_HOST='$host'
 SIGWIDE_RELAY_HOST='$relay_host'
+SIGWIDE_SITE_HOST='$site_host'
 ENTRA_CLIENT_ID='$client_id'
 ENTRA_CLIENT_SECRET='$client_secret'
 POSTGRES_PASSWORD='$(gen)'
@@ -56,6 +59,12 @@ CRON_SECRET='$(gen)'
 RELAY_SECRET='$(gen)'
 ENV
   say "Ayarlar $DIR/deploy/.env dosyasına yazıldı (yalnızca root okuyabilir)."
+fi
+
+# Settings added after the first release.
+if ! grep -q '^SIGWIDE_SITE_HOST=' .env; then
+  h="$(grep '^SIGWIDE_HOST=' .env | cut -d"'" -f2)"
+  echo "SIGWIDE_SITE_HOST='${SIGWIDE_SITE_HOST:-${h#*.}}'" >> .env
 fi
 
 # Ports Sigwide needs: web (80, 443) and mail from Exchange Online (25).

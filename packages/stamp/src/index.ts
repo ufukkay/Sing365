@@ -2,17 +2,18 @@
 // Adds a signature to a raw outgoing email (RFC 5322 / MIME) without touching anything else:
 // only the message's own text/html and text/plain bodies change; attachments, embedded
 // messages and every other byte are passed through as they were.
+import { randomBytes } from "node:crypto";
 import { Readable } from "node:stream";
 import iconv from "iconv-lite";
 import * as libbase64 from "libbase64";
 import libmime from "libmime";
 import * as libqp from "libqp";
 import { Splitter, type MimeNode, type SplitItem } from "mailsplit";
-import { insertHtmlSignature, type Placement } from "./html";
-import { insertTextSignature } from "./text";
+import { insertHtmlSignature, textToHtml, type Placement } from "./html";
+import { insertTextSignature, unflow } from "./text";
 
-export { insertHtmlSignature, replyMarker } from "./html";
-export { insertTextSignature } from "./text";
+export { insertHtmlSignature, replyMarker, textToHtml } from "./html";
+export { insertTextSignature, unflow } from "./text";
 
 /** Header Sigwide puts on every message it has handled; the Exchange rule skips messages that carry it. */
 export const SIGNED_HEADER = "X-Sigwide-Signed";
@@ -40,7 +41,7 @@ export interface Signature {
 }
 
 export type StampResult =
-  | { status: "signed"; raw: Buffer; info: MessageInfo; placement: Placement | "text-only" }
+  | { status: "signed"; raw: Buffer; info: MessageInfo; placement: Placement | "text-only" | "converted-to-html" }
   | { status: "skipped"; raw: Buffer; info: MessageInfo; reason: SkipReason | "no_signature" };
 
 // Reply/forward prefixes, matched on the Turkish lower-case subject (YNT = yanıt, İLT = ilet).
@@ -118,13 +119,12 @@ function bodyOf(items: SplitItem[], node: MimeNode): string {
   return iconv.encodingExists(charset) ? iconv.decode(bytes, charset) : bytes.toString("utf8");
 }
 
-/** Replaces a leaf node's body with `content`, re-encoded as UTF-8 quoted-printable. */
-function replaceBody(items: SplitItem[], node: MimeNode, content: string): SplitItem[] {
-  node.setCharset("utf-8");
-  node.headers.update("Content-Transfer-Encoding", "quoted-printable");
-  const encoded = libqp.wrap(libqp.encode(Buffer.from(content, "utf8")), 76).replace(/\r?\n/g, "\r\n");
+const qpEncode = (content: string) => libqp.wrap(libqp.encode(Buffer.from(content, "utf8")), 76).replace(/\r?\n/g, "\r\n");
+
+/** Puts `value` in place of a node's body. */
+function setBody(items: SplitItem[], node: MimeNode, value: Buffer): SplitItem[] {
   // The line break before the next boundary belongs to the multipart structure, not to the body.
-  const body: SplitItem = { type: "body", node, value: Buffer.from(encoded, "binary") };
+  const body: SplitItem = { type: "body", node, value };
   const out: SplitItem[] = [];
   let done = false;
   for (const i of items) {
@@ -136,6 +136,37 @@ function replaceBody(items: SplitItem[], node: MimeNode, content: string): Split
   // A node with an empty body has no body items: put the new one right after its headers.
   if (!done) out.splice(out.indexOf(node) + 1, 0, body);
   return out;
+}
+
+/** Replaces a leaf node's body with `content`, re-encoded as UTF-8 quoted-printable. */
+function replaceBody(items: SplitItem[], node: MimeNode, content: string): SplitItem[] {
+  node.setCharset("utf-8");
+  node.headers.update("Content-Transfer-Encoding", "quoted-printable");
+  return setBody(items, node, Buffer.from(qpEncode(content), "binary"));
+}
+
+/**
+ * Turns a plain-text body into text plus HTML (multipart/alternative), so the HTML signature
+ * shows. Phones often send plain text: without this their mail would only get the text signature.
+ */
+function convertToAlternative(items: SplitItem[], node: MimeNode, signature: Signature, reply: boolean): SplitItem[] {
+  const raw = bodyOf(items, node);
+  const text = node.flowed ? unflow(raw, Boolean(node.delSp)) : raw;
+  const marker = `\u2063sigwide-${randomBytes(6).toString("hex")}\u2063`;
+  const [before = "", after = ""] = insertTextSignature(text, marker, reply).split(marker);
+  const boundary = `sigwide-${randomBytes(12).toString("hex")}`;
+  const part = (type: string, content: string) =>
+    [`--${boundary}`, `Content-Type: ${type}; charset=utf-8`, "Content-Transfer-Encoding: quoted-printable", "", qpEncode(content)].join("\r\n");
+  const body = [
+    part("text/plain", insertTextSignature(text, signature.text, reply)),
+    part("text/html", textToHtml(before, signature.html, after)),
+    `--${boundary}--${node.root ? "\r\n" : ""}`,
+  ].join("\r\n");
+
+  node.headers.update("Content-Type", `multipart/alternative; boundary="${boundary}"`);
+  node.headers.remove("Content-Transfer-Encoding");
+  if (node.root && !node.headers.hasHeader("MIME-Version")) node.headers.add("MIME-Version", "1.0");
+  return setBody(items, node, Buffer.from(body, "utf8"));
 }
 
 function mark(items: SplitItem[], value: string): void {
@@ -172,6 +203,11 @@ export async function stampMessage(raw: Buffer, getSignature: (info: MessageInfo
   }
 
   const reply = info.mode === "reply";
+  if (!html && text && signature.html) {
+    const out = convertToAlternative(items, text, signature, reply);
+    mark(out, "1");
+    return { status: "signed", raw: join(out), info, placement: "converted-to-html" };
+  }
   let out = items;
   let placement: Placement | "text-only" = "text-only";
   if (html && signature.html) {

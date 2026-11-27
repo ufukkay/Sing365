@@ -12,7 +12,7 @@ Everything runs with Docker Compose on a single Linux server (tested on Ubuntu 2
 
 ## First install
 
-1. Point two DNS A records at the server: one for the panel (e.g. `app.example.com`), one for the relay (e.g. `relay.example.com`).
+1. Point DNS A records at the server: the panel (e.g. `app.example.com`), the relay (e.g. `relay.example.com`), and the public page (`example.com` and `www.example.com`; the page's host defaults to the panel's parent domain, override with `SIGWIDE_SITE_HOST`).
 2. In the Entra app registration, add the redirect URIs `https://<panel>/api/auth/callback/microsoft-entra-id` and `https://<panel>/api/consent/callback`, and create a client secret.
 3. As root on the server:
 

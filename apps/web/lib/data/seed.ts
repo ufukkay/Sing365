@@ -17,6 +17,7 @@ const tenant: Tenant = {
   domains: ["example.com"],
   deploymentMode: "client",
   consentStatus: "granted",
+  relayKeySet: false,
 };
 
 const groups: DirectoryGroup[] = [
@@ -149,7 +150,7 @@ const byTenant = <T,>(tenantId: string, rows: T[]): T[] => (tenantId === SEED_TE
 
 export const seedData: DataLayer = {
   async getTenant(id) {
-    return id === tenant.id ? tenant : null;
+    return id === tenant.id ? { ...tenant, relayKeySet: relayHashes.has(tenant.id) } : null;
   },
   async getTenantByEntraId(tid) {
     return tid === tenant.entraTenantId ? tenant : null;
