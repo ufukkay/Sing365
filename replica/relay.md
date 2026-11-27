@@ -44,12 +44,17 @@ RELAY_SECRET=<same as the web app> SING365_API_URL=http://localhost:3000 pnpm --
 
 Production: `pnpm --filter @sing365/relay build` gives one file, `apps/relay/dist/relay.mjs` (`node dist/relay.mjs`). Settings: `RELAY_HOSTNAME` (public name, also the certificate's name), `RELAY_TLS_KEY_FILE`, `RELAY_TLS_CERT_FILE`, `RELAY_SECRET`, `SING365_API_URL`; optional `RELAY_PORT` (25), `RELAY_ALLOWED_NETWORKS` (defaults to Exchange Online's published ranges; check endpoints.office.com), `RELAY_RETURN_HOST` (only when a tenant's MX is not Exchange Online). One JSON log line per message: status, placement or reason, size, time. No addresses or content.
 
-Host requirements: a fixed public host name with a publicly trusted certificate; inbound port 25 reachable from Exchange Online; **outbound port 25** to Exchange Online allowed (several clouds block it by default, so check before choosing a host); the web app reachable from the relay (same machine is simplest).
+Host requirements: a fixed public host name with a publicly trusted certificate; inbound port 25 reachable from Exchange Online; **outbound port 25** to Exchange Online allowed (Azure allows it only on Enterprise Agreement / MCA-E subscriptions; many VPS providers block it until asked); the web app reachable from the relay (same machine is simplest).
 
 ## Exchange Online setup (per customer)
 
+Follows Microsoft's "Integrate Exchange Online with an email add-on service" scenario.
+
 1. Panel: create the tenant's relay key (shown once). *(Panel page still to build.)*
-2. Exchange admin center › Mail flow › Connectors › add **outbound**: from Office 365 to partner organization, name "Sing365", use only when a transport rule redirects messages to it, smart host = relay host name, always use TLS, certificate issued by a trusted CA and matching the relay host name.
-3. Add **inbound**: from your organization's email server to Office 365, identify by the certificate subject = relay host name.
-4. Mail flow › Rules › new rule "Sing365 imza": apply if the sender is a member of "Sing365 Test"; actions: set message header `X-Sing365-Key` to the key, and redirect the message to the "Sing365" connector; except if message header `X-Sing365-Signed` includes `1` or `skipped`.
-5. Send a test mail; widen the group when it looks right.
+2. The relay's certificate name (e.g. `relay.talay.com`, 48 characters or less) must be an **accepted domain** of the tenant (Microsoft 365 admin center › Domains, verified by TXT). A subdomain of an already verified domain is quick.
+3. Exchange admin center › Mail flow › Connectors › add **outbound**: from Office 365 to *your organization's email server*, name "Sing365", use only when a transport rule redirects messages to it, smart host = relay host name, always use TLS with a certificate issued by a trusted CA whose name matches the smart host, keep internal Exchange headers.
+   `New-OutboundConnector -Name Sing365 -ConnectorType OnPremises -IsTransportRuleScoped $true -UseMxRecord $false -SmartHosts <relay host> -TlsSettings DomainValidation -TlsDomain <relay host> -CloudServicesMailEnabled $true`
+4. Add **inbound**: from your organization's email server to Office 365, identified by the certificate name = relay host name.
+   `New-InboundConnector -Name Sing365 -ConnectorType OnPremises -SenderDomains * -RequireTls $true -RestrictDomainsToCertificate $true -TlsSenderCertificateName <relay host> -CloudServicesMailEnabled $true`
+5. Mail flow › Rules › new rule "Sing365 imza": apply if the sender is a member of "Sing365 Test"; actions: set message header `X-Sing365-Key` to the key, and redirect the message to the "Sing365" connector; except if message header `X-Sing365-Signed` includes `1` or `skipped` (the loop guard); stop processing more rules.
+6. Send a test mail; widen the group when it looks right.
