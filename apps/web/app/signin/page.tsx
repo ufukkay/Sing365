@@ -1,5 +1,5 @@
 import { Card } from "@/components/ui";
-import { entraConfigured } from "@/lib/env";
+import { dbConfigured, entraConfigured, missingEntraSettings } from "@/lib/env";
 
 export const metadata = { title: "Giriş" };
 
@@ -30,7 +30,19 @@ export default async function SignIn({ searchParams }: { searchParams: Promise<{
             Microsoft ile giriş yap
           </a>
         ) : (
-          <p className="mt-6 text-sm text-text-muted">Giriş henüz yapılandırılmadı (ENTRA_CLIENT_ID, ENTRA_CLIENT_SECRET, SESSION_SECRET).</p>
+          <div className="mt-6 text-sm text-text-muted">
+            <p>Giriş henüz yapılandırılmadı.</p>
+            {process.env.NODE_ENV !== "production" && (
+              <>
+                <p className="mt-2">Eksik ayarlar: {missingEntraSettings().join(", ")}{!dbConfigured() && ", DATABASE_URL"}.</p>
+                <p className="mt-2">
+                  Bu değerler <code className="font-mono">apps/web/.env.local</code> dosyasında olmalı. Windows Not Defteri dosyayı{" "}
+                  <code className="font-mono">.env.local.txt</code> olarak kaydedebilir; adı kontrol edin ve değişiklikten sonra{" "}
+                  <code className="font-mono">pnpm dev</code> komutunu yeniden başlatın.
+                </p>
+              </>
+            )}
+          </div>
         )}
       </Card>
     </main>
