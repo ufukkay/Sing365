@@ -218,5 +218,35 @@ export function postgresData(db: Db): DataLayer {
         where id = ${templateId} returning id`);
       if (rows.length === 0) throw new Error("template not found");
     },
+    async updateVisualTemplate(tenantId, templateId, input) {
+      return db.forTenant(tenantId, async (tx) => {
+        const [updated] = await tx<{ id: string }[]>`
+          update templates
+          set name = ${input.name}, layout = ${tx.json(input.layout as never)},
+              sort_order = coalesce(${input.placement?.priority ?? null}, sort_order), version = version + 1
+          where id = ${templateId} and tenant_id = ${tenantId} and kind = 'signature'
+            and version = ${input.version} and status in ('draft', 'published')
+          returning id`;
+        if (!updated) return false;
+        if (input.placement) {
+          const { ruleId, senders, recipients, appliesTo } = input.placement;
+          const [rule] = await tx<{ id: string }[]>`
+            update rules
+            set senders = ${tx.json(senders as never)}, recipients = ${tx.json(recipients as never)}, applies_to = ${appliesTo}
+            where id = ${ruleId} and template_id = ${templateId} and tenant_id = ${tenantId}
+            returning id`;
+          if (!rule) throw new Error("signature rule no longer exists");
+        }
+        return true;
+      });
+    },
+    async setVisualTemplateStatus(tenantId, templateId, version, status) {
+      const rows = await db.forTenant(tenantId, (tx) => tx`
+        update templates set status = ${status}, version = version + 1
+        where id = ${templateId} and tenant_id = ${tenantId} and kind = 'signature'
+          and version = ${version} and status = ${status === "draft" ? "published" : "draft"}
+        returning id`);
+      return rows.length > 0;
+    },
   };
 }

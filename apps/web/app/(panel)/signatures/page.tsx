@@ -1,8 +1,8 @@
 import Link from "next/link";
-import { Badge, Button, Card, EmptyState, PageHeader } from "@/components/ui";
+import { Plus } from "lucide-react";
+import { Badge, Card, EmptyState, PageHeader } from "@/components/ui";
 import { data } from "@/lib/data";
 import { requirePanel } from "@/lib/context";
-import { addStarterTemplatesAction } from "./actions";
 
 export const metadata = { title: "İmzalar" };
 
@@ -23,9 +23,9 @@ export default async function SignaturesPage() {
         actions={
           <Link
             href="/signatures/new"
-            className="inline-flex h-9 items-center rounded-md border border-border bg-surface-raised px-4 text-sm font-semibold text-text hover:bg-surface"
+            className="inline-flex h-9 items-center gap-2 rounded-md bg-accent px-4 text-sm font-semibold text-on-accent hover:bg-accent-hover"
           >
-            HTML'den imza ekle
+            <Plus aria-hidden size={16} /> Yeni imza
           </Link>
         }
       />
@@ -33,11 +33,9 @@ export default async function SignaturesPage() {
         {signatures.length === 0 ? (
           <EmptyState
             title="Henüz imza yok"
-            body="Hazır iki imzayla başlayın: yeni e-postalar için kurumsal imza, yanıtlar için kısa imza. Ad, unvan ve telefon gibi bilgiler her kişi için dizinden otomatik dolar."
+            body="Kurumsal imza, kısa yanıt veya boş şablonla başlayın. Kullanıcı bilgilerini Entra dizininden ekleyin."
             action={
-              <form action={addStarterTemplatesAction}>
-                <Button type="submit">Hazır imzaları ekle</Button>
-              </form>
+              <Link href="/signatures/new" className="text-sm font-semibold text-accent underline">Şablon seç</Link>
             }
           />
         ) : (
@@ -65,7 +63,7 @@ export default async function SignaturesPage() {
                           </Link>
                         </td>
                         <td className="py-3 pr-4">
-                          {t.status === "published" ? <Badge tone="success">Yayında</Badge> : <Badge>Taslak</Badge>}
+                          {t.status === "published" ? <Badge tone="success">Yayında</Badge> : <Badge>{t.status === "archived" ? "Arşivde" : "Taslak"}</Badge>}
                         </td>
                         <td className="py-3 pr-4 tabular-nums">{Number.isFinite(p) ? p : "kural yok"}</td>
                         <td className="py-3 pr-4 tabular-nums">v{t.version}</td>

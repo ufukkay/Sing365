@@ -7,6 +7,8 @@ import { data } from "@/lib/data";
 import { requirePanel } from "@/lib/context";
 import { FIELD_HELP, htmlOf } from "@/lib/html-template";
 import { buildSignature, fieldValues } from "@/lib/signature";
+import { parseVisualLayout, simpleVisualRule, visualFields, visualSampleSources } from "@/lib/visual-signature";
+import { changeVisualTemplateStatusAction, duplicateVisualTemplateAction } from "../actions";
 
 export const metadata = { title: "İmza önizleme" };
 
@@ -25,7 +27,7 @@ export default async function SignaturePreview({
   searchParams,
 }: {
   params: Promise<{ id: string }>;
-  searchParams: Promise<{ user?: string; email?: string; mode?: string; to?: string }>;
+  searchParams: Promise<{ user?: string; email?: string; mode?: string; to?: string; notice?: string }>;
 }) {
   const { tenantId, session } = await requirePanel();
   const { id } = await params;
@@ -46,7 +48,7 @@ export default async function SignaturePreview({
   const mode = sp.mode === "reply" ? "reply" : "new";
   const to = sp.to ?? "musteri@baskafirma.com";
 
-  const preview = user ? render(template.layout, fieldValues(user)) : null;
+  const preview = render(template.layout, user ? fieldValues(user) : visualSampleSources[0]?.values ?? {});
   const live = user
     ? await buildSignature(data, { tenantId: tenantId, from: user.email, mode, recipients: to.split(",").map((s) => s.trim()).filter(Boolean) })
     : null;
@@ -55,8 +57,17 @@ export default async function SignaturePreview({
   const groups = await data.listGroups(tenantId);
   /** The rules engine reports group ids; show the directory names instead. */
   const readable = (detail: string) => groups.reduce((s, g) => s.split(g.id).join(`"${g.displayName}"`), detail);
-  const fieldName = (key: string) => FIELD_HELP.find((f) => f.key === key)?.label ?? key;
+  const fieldName = (key: string) => visualFields.find((f) => f.key === key)?.label ?? FIELD_HELP.find((f) => f.key === key)?.label ?? key;
   const isHtml = htmlOf(template) !== null;
+  const visual = template.kind === "signature" && Boolean(parseVisualLayout(template.layout).layout);
+  const editable = visual && template.status !== "archived";
+  const placement = editable ? simpleVisualRule((await data.listRules(tenantId)).filter((r) => r.templateId === id)) : undefined;
+  const sender = placement?.senders.groups?.[0];
+  const messageType = { new: "Yeni e-postalar", reply: "Yanıtlar ve iletmeler", both: "Tüm ileti türleri" };
+  const recipientScope = { any: "Tüm alıcılar", internal: "Şirket içi", external: "Şirket dışı" };
+  const notice = sp.notice === "empty" ? "Yayımlamak için imzaya bir içerik bloğu ekleyin."
+    : sp.notice === "rule" ? "Yayımlamak için etkin bir uygulama kuralı gerekiyor."
+    : sp.notice === "conflict" ? "Şablon değişti. Geçerli sürümü kontrol edip yeniden deneyin." : null;
 
   return (
     <>
@@ -64,11 +75,17 @@ export default async function SignaturePreview({
         title={template.name}
         description="Bu imzanın seçilen kişide nasıl göründüğünü ve o kişinin gerçekte hangi imzayı aldığını gösterir."
         actions={
-          <div className="flex items-center gap-4">
-            {isHtml && (
+          <div className="flex flex-wrap items-center gap-4">
+            {editable && (
               <Link href={`/signatures/${template.id}/edit`} className="text-sm font-medium text-accent underline">
-                HTML'i düzenle
+                Düzenle
               </Link>
+            )}
+            {visual && (
+              <form action={duplicateVisualTemplateAction}>
+                <input type="hidden" name="id" value={id} />
+                <Button variant="secondary" type="submit">Şablonu çoğalt</Button>
+              </form>
             )}
             <Link href="/signatures" className="text-sm font-medium text-accent underline">
               Tüm imzalar
@@ -118,27 +135,42 @@ export default async function SignaturePreview({
         </Card>
 
         <div className="flex min-w-0 flex-col gap-6">
+          {editable && (
+            <Card title="Uygulama" actions={
+              <form action={changeVisualTemplateStatusAction}>
+                <input type="hidden" name="id" value={id} />
+                <input type="hidden" name="version" value={template.version} />
+                <input type="hidden" name="status" value={template.status === "draft" ? "published" : "draft"} />
+                <Button variant={template.status === "draft" ? "primary" : "secondary"} type="submit">
+                  {template.status === "draft" ? "Yayımla" : "Yayından kaldır"}
+                </Button>
+              </form>
+            }>
+              {notice && <p role="alert" className="mb-3 text-sm text-danger">{notice}</p>}
+              {placement && (
+                <p className="text-sm text-text-muted">
+                  {sender ? groups.find((group) => group.id === sender)?.displayName ?? "Dizin grubu" : "Tüm gönderenler"}
+                  {" · "}{messageType[placement.appliesTo]}{" · "}{recipientScope[placement.recipients.scope]}{" · "}Öncelik {placement.priority}
+                </p>
+              )}
+            </Card>
+          )}
           <Card
             title="Bu imza"
-            actions={template.status === "published" ? <Badge tone="success">Yayında · v{template.version}</Badge> : <Badge>Taslak</Badge>}
+            actions={template.status === "published" ? <Badge tone="success">Yayında · v{template.version}</Badge> : <Badge>{template.status === "archived" ? "Arşivde" : "Taslak"}</Badge>}
           >
-            {!user && <p className="text-sm text-text-muted">Önizleme için soldan bir kişi seçin.</p>}
-            {preview && (
-              <>
-                <iframe
-                  title={`${template.name} önizlemesi`}
-                  srcDoc={`<!doctype html><meta charset="utf-8"><body style="margin:16px;background:#fff">${preview.html}</body>`}
-                  sandbox=""
-                  className="h-64 w-full rounded-md border border-border bg-white"
-                />
-                <CopySignature html={preview.html} text={preview.text} />
-                {preview.missing.length > 0 && (
-                  <p className="mt-3 text-xs text-text-muted">
-                    {isHtml ? "Bu kişide boş olan alanlar" : "Bu kişide boş olan alanlar (satırları gizlendi)"}:{" "}
-                    {preview.missing.map(fieldName).join(", ")}
-                  </p>
-                )}
-              </>
+            {!user && <p className="mb-3 text-sm text-text-muted">Örnek kullanıcı bilgileriyle gösteriliyor.</p>}
+            <iframe
+              title={`${template.name} önizlemesi`}
+              srcDoc={`<!doctype html><meta charset="utf-8"><body style="margin:16px;background:#fff">${preview.html}</body>`}
+              sandbox=""
+              className="h-64 w-full rounded-md border border-border bg-white"
+            />
+            <CopySignature html={preview.html} text={preview.text} />
+            {preview.missing.length > 0 && (
+              <p className="mt-3 text-xs text-text-muted">
+                {preview.missing.map(fieldName).join(", ")} {isHtml ? "alanları bu kişide boş." : "alanları bu kişide boş olduğu için gizlendi."}
+              </p>
             )}
           </Card>
 

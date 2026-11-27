@@ -1,34 +1,32 @@
 import Link from "next/link";
-import { FieldHelp } from "@/components/field-help";
-import { HtmlTemplateForm } from "@/components/html-template-form";
-import { Card, PageHeader } from "@/components/ui";
+import { SignatureDesigner } from "@/components/signature-designer";
+import { PageHeader } from "@/components/ui";
 import { requirePanel } from "@/lib/context";
 import { data } from "@/lib/data";
 import { fieldValues } from "@/lib/signature";
-import { saveHtmlTemplateAction } from "../actions";
+import { visualFields, visualProfiles, visualSampleSources } from "@/lib/visual-signature";
+import { previewVisualTemplateAction, saveVisualTemplateAction } from "../actions";
 
-export const metadata = { title: "HTML'den imza" };
+export const metadata = { title: "Yeni imza" };
 
-export default async function NewHtmlSignature() {
+export default async function NewSignature() {
   const { tenantId, session } = await requirePanel();
-  const me = session ? await data.findUserByEmail(tenantId, session.email) : null;
+  const [me, groups] = await Promise.all([
+    session ? data.findUserByEmail(tenantId, session.email) : null,
+    data.listGroups(tenantId),
+  ]);
+  const sources = me ? [{ label: `Dizin · ${me.displayName}`, values: fieldValues(me) }, ...visualSampleSources] : visualSampleSources;
+
   return (
     <>
       <PageHeader
-        title="HTML'den imza oluştur"
-        description="Kullandığınız imza HTML'ini yapıştırın; kişiye göre değişen yerlere alan yazın. Herkese, dizindeki kendi bilgileriyle uygulanır."
-        actions={
-          <Link href="/signatures" className="text-sm font-medium text-accent underline">
-            Tüm imzalar
-          </Link>
-        }
+        title="İmza tasarla"
+        actions={<Link href="/signatures" className="text-sm font-medium text-accent underline-offset-4 hover:underline">Tüm imzalar</Link>}
       />
-      <div className="grid gap-6 lg:grid-cols-[1fr_360px]">
-        <Card>
-          <HtmlTemplateForm action={saveHtmlTemplateAction} />
-        </Card>
-        <FieldHelp values={me ? fieldValues(me) : null} />
-      </div>
+      <SignatureDesigner
+        action={saveVisualTemplateAction} preview={previewVisualTemplateAction}
+        sources={sources} profiles={visualProfiles} fields={visualFields} groups={groups}
+      />
     </>
   );
 }

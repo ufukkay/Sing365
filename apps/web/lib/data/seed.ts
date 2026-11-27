@@ -216,4 +216,23 @@ export const seedData: DataLayer = {
     if (!t) throw new Error("template not found");
     Object.assign(t, { name: input.name, layout: input.layout, version: t.version + 1, updatedAt: new Date().toISOString() });
   },
+  async updateVisualTemplate(tenantId, templateId, input) {
+    const template = byTenant(tenantId, templates).find((entry) => entry.id === templateId);
+    if (!template || template.kind !== "signature" || template.version !== input.version || template.status === "archived") return false;
+    if (input.placement) {
+      const { ruleId, priority, senders, recipients, appliesTo } = input.placement;
+      const rule = byTenant(tenantId, rules).find((entry) => entry.id === ruleId && entry.templateId === templateId);
+      if (!rule) return false;
+      Object.assign(rule, { priority, senders, recipients, appliesTo });
+    }
+    Object.assign(template, { name: input.name, layout: input.layout, version: template.version + 1, updatedAt: new Date().toISOString() });
+    return true;
+  },
+  async setVisualTemplateStatus(tenantId, templateId, version, status) {
+    const template = byTenant(tenantId, templates).find((entry) => entry.id === templateId);
+    const expected = status === "draft" ? "published" : "draft";
+    if (!template || template.kind !== "signature" || template.version !== version || template.status !== expected) return false;
+    Object.assign(template, { status, version: template.version + 1, updatedAt: new Date().toISOString() });
+    return true;
+  },
 };

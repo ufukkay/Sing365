@@ -87,6 +87,13 @@ export interface PersonRef {
   displayName: string;
 }
 
+export interface VisualTemplateUpdate {
+  name: string;
+  layout: Layout;
+  version: number;
+  placement?: { ruleId: string; priority: number } & Pick<Rule, "senders" | "recipients" | "appliesTo">;
+}
+
 export interface DataLayer {
   getTenant(tenantId: string): Promise<Tenant | null>;
   getTenantByEntraId(entraTenantId: string): Promise<Tenant | null>;
@@ -111,4 +118,6 @@ export interface DataLayer {
   createTemplateWithRule(tenantId: string, input: NewTemplate): Promise<string>;
   /** Replaces a template's name and layout and bumps its version (the add-in re-fetches on a new version). */
   updateTemplate(tenantId: string, templateId: string, input: { name: string; layout: Layout }): Promise<void>;
+  updateVisualTemplate(tenantId: string, templateId: string, input: VisualTemplateUpdate): Promise<boolean>;
+  setVisualTemplateStatus(tenantId: string, templateId: string, version: number, status: "draft" | "published"): Promise<boolean>;
 }

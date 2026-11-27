@@ -74,6 +74,21 @@ const SECTION = /\{\{\s*([#^])\s*([a-z][a-z0-9_.]*)\s*\}\}([\s\S]*?)\{\{\s*\/\s*
 const HEX = /^#[0-9a-f]{6}$/i;
 const SAFE_URL = /^(https:\/\/|http:\/\/|mailto:|tel:)/i;
 
+export function isSignatureImageUrl(value: string): boolean {
+  try {
+    const url = new URL(value);
+    if (url.username || url.password) return false;
+    if (url.protocol === "https:") return true;
+    // Loopback media is only for inspecting uploaded logos during local development.
+    return process.env.NODE_ENV !== "production" && url.protocol === "http:"
+      && ["localhost", "127.0.0.1", "[::1]"].includes(url.hostname)
+      && /^\/api\/signature-assets\/[\da-f]{8}-[\da-f]{4}-4[\da-f]{3}-[89ab][\da-f]{3}-[\da-f]{12}$/i.test(url.pathname)
+      && !url.search && !url.hash;
+  } catch {
+    return false;
+  }
+}
+
 export function escapeHtml(s: string): string {
   return s
     .replace(/&/g, "&amp;")
@@ -211,11 +226,11 @@ function safeHref(ctx: Ctx, href: string | undefined): string | null {
   if (!href) return null;
   const filled = fill(ctx, href, encodeHrefPart);
   if (!filled || !SAFE_URL.test(filled)) return null;
-  return filled;
+  return /^tel:/i.test(filled) ? filled.replace(/\s/g, "") : filled;
 }
 
 function encodeHrefPart(s: string): string {
-  // literal parts of a URL are kept, values are attribute-escaped; spaces dropped for tel:
+  // Keep literal parts of a URL and escape the attribute content.
   return escapeHtml(s);
 }
 
@@ -245,8 +260,8 @@ function renderElement(ctx: Ctx, el: Element, text: string[]): string | null {
   const l = ctx.layout;
   switch (el.type) {
     case "text": {
-      const html = fill(ctx, el.text, escapeHtml);
-      if (html === null) return null;
+      const html = fill(ctx, el.text, escapeHtml)?.replace(/\r\n?|\n/g, "<br>");
+      if (html === undefined) return null;
       const plain = fill(ctx, el.text, (x) => x)!;
       text.push(plain);
       const style = textStyle(ctx, el.style);
@@ -258,7 +273,7 @@ function renderElement(ctx: Ctx, el: Element, text: string[]): string | null {
     }
     case "image": {
       const src = safeHref(ctx, el.src);
-      if (!src || !/^https:\/\//i.test(src)) return null; // hosted HTTPS images only
+      if (!src || !isSignatureImageUrl(src)) return null;
       const alt = fill(ctx, el.alt, escapeHtml) ?? "";
       const w = Math.max(1, Math.min(l.maxWidth ?? 600, Math.round(el.width)));
       const h = Math.max(1, Math.round(el.height));
