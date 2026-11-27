@@ -28,7 +28,7 @@ const exchange = new SMTPServer({
   },
 });
 
-// A fake Sing365 web app.
+// A fake Sigwide web app.
 let apiUp = true;
 const apiCalls: unknown[] = [];
 const realFetch = globalThis.fetch;
@@ -115,7 +115,7 @@ afterAll(async () => {
 describe("relay", () => {
   it("signs the message and hands it back to Exchange with the same envelope", async () => {
     const port = await startRelay(config());
-    await send(port, mail(["X-Sing365-Key: good-key"]));
+    await send(port, mail(["X-Sigwide-Key: good-key"]));
 
     expect(apiCalls).toEqual([
       {
@@ -132,8 +132,8 @@ describe("relay", () => {
     expect(received[0]!.to).toEqual(["musteri@baskafirma.com", "ali@talay.com"]);
     const m = await simpleParser(received[0]!.raw);
     expect(m.text).toBe("Merhaba,\nTeklif ektedir.\n\nUfuk KAYA\nKıdemli Uzman\n");
-    expect(m.headers.get("x-sing365-signed")).toBe("1");
-    expect(m.headers.has("x-sing365-key")).toBe(false);
+    expect(m.headers.get("x-sigwide-signed")).toBe("1");
+    expect(m.headers.has("x-sigwide-key")).toBe(false);
     expect(logs).toEqual([expect.objectContaining({ status: "signed", placement: "text-only", mode: "new" })]);
     // No addresses in the log.
     expect(JSON.stringify(logs)).not.toMatch(/@/);
@@ -142,19 +142,19 @@ describe("relay", () => {
   it("refuses messages without a key or with an unknown key, so it can never relay for strangers", async () => {
     const port = await startRelay(config());
     await expect(send(port, mail([]))).rejects.toMatchObject({ responseCode: 550 });
-    await expect(send(port, mail(["X-Sing365-Key: wrong"]))).rejects.toMatchObject({ responseCode: 550 });
+    await expect(send(port, mail(["X-Sigwide-Key: wrong"]))).rejects.toMatchObject({ responseCode: 550 });
     expect(received).toHaveLength(0);
   });
 
   it("refuses connections from outside Exchange Online", async () => {
     const port = await startRelay(config({ allowedNetworks: ["10.0.0.0/8"] }));
-    await expect(send(port, mail(["X-Sing365-Key: good-key"]))).rejects.toMatchObject({ responseCode: 554 });
+    await expect(send(port, mail(["X-Sigwide-Key: good-key"]))).rejects.toMatchObject({ responseCode: 554 });
     expect(received).toHaveLength(0);
   });
 
-  it("refuses a message that already went through Sing365 (a loop in the Exchange rule)", async () => {
+  it("refuses a message that already went through Sigwide (a loop in the Exchange rule)", async () => {
     const port = await startRelay(config());
-    await expect(send(port, mail(["X-Sing365-Key: good-key", "X-Sing365-Signed: 1"]))).rejects.toMatchObject({ responseCode: 554 });
+    await expect(send(port, mail(["X-Sigwide-Key: good-key", "X-Sigwide-Signed: 1"]))).rejects.toMatchObject({ responseCode: 554 });
   });
 
   it("passes S/MIME and meeting invites through unchanged but marked", async () => {
@@ -164,7 +164,7 @@ describe("relay", () => {
         "From: ufuk.kaya@talay.com",
         "Subject: Toplanti",
         "MIME-Version: 1.0",
-        "X-Sing365-Key: good-key",
+        "X-Sigwide-Key: good-key",
         'Content-Type: multipart/alternative; boundary="c"',
         "",
         "--c\r\nContent-Type: text/plain\r\n\r\nDavet\r\n--c\r\nContent-Type: text/calendar; method=REQUEST\r\n\r\nBEGIN:VCALENDAR\r\nEND:VCALENDAR\r\n--c--\r\n",
@@ -172,27 +172,27 @@ describe("relay", () => {
     );
     await send(port, raw);
     expect(apiCalls).toEqual([expect.objectContaining({ skip: true })]);
-    expect(received[0]!.raw.toString()).toContain("X-Sing365-Signed: skipped; calendar");
+    expect(received[0]!.raw.toString()).toContain("X-Sigwide-Signed: skipped; calendar");
     expect(received[0]!.raw.toString()).toContain("--c\r\nContent-Type: text/plain\r\n\r\nDavet\r\n");
   });
 
-  it("asks Exchange to retry when Sing365 is down, unless the key worked recently (then it delivers unsigned)", async () => {
+  it("asks Exchange to retry when Sigwide is down, unless the key worked recently (then it delivers unsigned)", async () => {
     const port = await startRelay(config());
     apiUp = false;
-    await expect(send(port, mail(["X-Sing365-Key: good-key"]))).rejects.toMatchObject({ responseCode: 451 });
+    await expect(send(port, mail(["X-Sigwide-Key: good-key"]))).rejects.toMatchObject({ responseCode: 451 });
 
     apiUp = true;
-    await send(port, mail(["X-Sing365-Key: good-key"]));
+    await send(port, mail(["X-Sigwide-Key: good-key"]));
     apiUp = false;
-    await send(port, mail(["X-Sing365-Key: good-key"]));
+    await send(port, mail(["X-Sigwide-Key: good-key"]));
     expect(received).toHaveLength(2);
-    expect(received[1]!.raw.toString()).toContain("X-Sing365-Signed: skipped; no_signature");
+    expect(received[1]!.raw.toString()).toContain("X-Sigwide-Signed: skipped; no_signature");
   });
 
   it("asks Exchange to retry when the message cannot be handed back", async () => {
     const port = await startRelay(config());
     exchangeUp = false;
-    await expect(send(port, mail(["X-Sing365-Key: good-key"]))).rejects.toMatchObject({ responseCode: 451 });
+    await expect(send(port, mail(["X-Sigwide-Key: good-key"]))).rejects.toMatchObject({ responseCode: 451 });
   });
 });
 

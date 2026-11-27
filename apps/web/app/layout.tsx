@@ -2,7 +2,7 @@ import type { Metadata } from "next";
 import "./globals.css";
 
 export const metadata: Metadata = {
-  title: { default: "Sing365", template: "%s · Sing365" },
+  title: { default: "Sigwide", template: "%s · Sigwide" },
   description: "Microsoft 365 için merkezi e-posta imza yönetimi",
 };
 

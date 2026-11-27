@@ -1,6 +1,6 @@
-# Sing365
+# Sigwide
 
-Centralized email signature management for Microsoft 365.
+Centralized email signature management for Microsoft 365 (working name until 2026-11: Sing365; internal package names still use `@sing365/*`).
 
 ## How this repo is built
 

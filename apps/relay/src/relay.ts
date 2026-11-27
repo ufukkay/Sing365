@@ -1,4 +1,4 @@
-// The Sing365 mail relay. Exchange Online's outbound connector hands it each message its
+// The Sigwide mail relay. Exchange Online's outbound connector hands it each message its
 // transport rule selects; the relay adds the sender's signature and hands the message back to
 // the same tenant's Exchange Online, which delivers it. Nothing is stored: message bodies only
 // pass through memory.
@@ -58,7 +58,7 @@ export function allowed(list: BlockList, ip: string): boolean {
 export function apiSigner(cfg: RelayConfig): RelayDeps["sign"] {
   const goodKeys = new Map<string, { until: number; returnDomain: string }>();
   return async (info, recipients) => {
-    if (!info.key) throw new SmtpError(550, "5.7.1 Missing Sing365 key; check the Exchange rule that routes mail to Sing365");
+    if (!info.key) throw new SmtpError(550, "5.7.1 Missing Sigwide key; check the Exchange rule that routes mail to Sigwide");
     let res: Response;
     try {
       res = await fetch(`${cfg.apiUrl}/api/relay/sign`, {
@@ -72,17 +72,17 @@ export function apiSigner(cfg: RelayConfig): RelayDeps["sign"] {
     }
     if (res.status === 403) {
       goodKeys.delete(info.key);
-      throw new SmtpError(550, "5.7.1 Unknown Sing365 key");
+      throw new SmtpError(550, "5.7.1 Unknown Sigwide key");
     }
     if (res.ok) {
       const answer = (await res.json()) as SignAnswer;
       goodKeys.set(info.key, { until: Date.now() + cfg.keyGraceMs, returnDomain: answer.returnDomain });
       return answer;
     }
-    // Sing365 itself is down: mail from a tenant we recently verified still flows, unsigned.
+    // Sigwide itself is down: mail from a tenant we recently verified still flows, unsigned.
     const known = goodKeys.get(info.key);
     if (known && known.until > Date.now()) return { signature: null, returnDomain: known.returnDomain };
-    throw new SmtpError(451, "4.3.0 Sing365 is temporarily unavailable; please retry");
+    throw new SmtpError(451, "4.3.0 Sigwide is temporarily unavailable; please retry");
   };
 }
 
@@ -115,7 +115,7 @@ export function createRelay(cfg: RelayConfig, deps: RelayDeps): SMTPServer {
     const recipients = session.envelope.rcptTo.map((r) => r.address.toLowerCase());
     const info = await inspectMessage(raw);
     if (info.skip === "already_signed") {
-      throw new SmtpError(554, "5.4.6 Message already went through Sing365: the Exchange rule needs its X-Sing365-Signed exception");
+      throw new SmtpError(554, "5.4.6 Message already went through Sigwide: the Exchange rule needs its X-Sigwide-Signed exception");
     }
 
     const answer = await deps.sign(info, recipients);
@@ -129,7 +129,7 @@ export function createRelay(cfg: RelayConfig, deps: RelayDeps): SMTPServer {
       requireTLS: cfg.requireTls,
       ignoreTLS: !cfg.requireTls && !cfg.tls,
       name: cfg.hostName,
-      // Exchange Online's inbound connector recognises Sing365 by this certificate.
+      // Exchange Online's inbound connector recognises Sigwide by this certificate.
       tls: cfg.tls ? { key: cfg.tls.key, cert: cfg.tls.cert, servername: host } : undefined,
       connectionTimeout: 30_000,
       socketTimeout: 60_000,
@@ -156,7 +156,7 @@ export function createRelay(cfg: RelayConfig, deps: RelayDeps): SMTPServer {
 
   return new SMTPServer({
     name: cfg.hostName,
-    banner: "Sing365 signature relay",
+    banner: "Sigwide signature relay",
     secure: false,
     ...(cfg.tls ? { key: cfg.tls.key, cert: cfg.tls.cert } : { hideSTARTTLS: true }),
     authOptional: true,
@@ -179,7 +179,7 @@ export function createRelay(cfg: RelayConfig, deps: RelayDeps): SMTPServer {
         .then(
           () => callback(),
           (e: unknown) => {
-            const err = e instanceof SmtpError ? e : new SmtpError(451, "4.3.0 Sing365 could not process the message; please retry");
+            const err = e instanceof SmtpError ? e : new SmtpError(451, "4.3.0 Sigwide could not process the message; please retry");
             if (!(e instanceof SmtpError)) deps.log({ at: new Date().toISOString(), status: "error", error: String(e) });
             else deps.log({ at: new Date().toISOString(), status: "rejected", code: err.responseCode, error: err.message });
             callback(err);
