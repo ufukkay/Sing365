@@ -20,6 +20,14 @@ export default async function SignaturesPage() {
       <PageHeader
         title="İmzalar"
         description="Kurallar öncelik sırasıyla çalışır: bir gönderen için eşleşen ilk kural imzayı belirler."
+        actions={
+          <Link
+            href="/signatures/new"
+            className="inline-flex h-9 items-center rounded-md border border-border bg-surface-raised px-4 text-sm font-semibold text-text hover:bg-surface"
+          >
+            HTML'den imza ekle
+          </Link>
+        }
       />
       <Card>
         {signatures.length === 0 ? (

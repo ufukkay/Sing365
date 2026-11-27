@@ -186,4 +186,9 @@ export const seedData: DataLayer = {
     rules.push({ id: `r-${id}`, templateId: id, priority: input.priority, enabled: input.rule.enabled ?? true, ...input.rule });
     return id;
   },
+  async updateTemplate(tenantId, templateId, input) {
+    const t = byTenant(tenantId, templates).find((x) => x.id === templateId);
+    if (!t) throw new Error("template not found");
+    Object.assign(t, { name: input.name, layout: input.layout, version: t.version + 1, updatedAt: new Date().toISOString() });
+  },
 };

@@ -18,11 +18,15 @@ interface UserRow {
   office_location: string | null;
   business_phone: string | null;
   mobile_phone: string | null;
+  street_address: string | null;
   city: string | null;
+  state: string | null;
+  postal_code: string | null;
   country: string | null;
   photo_url: string | null;
   group_ids: string[] | null;
   custom_attrs: Record<string, string>;
+  extension_attrs: Record<string, string> | null;
   overrides: Record<string, string>;
   account_enabled: boolean;
   last_synced_at: Date | null;
@@ -41,11 +45,15 @@ const toUser = (r: UserRow): DirectoryUser => ({
   officeLocation: r.office_location ?? undefined,
   businessPhone: r.business_phone ?? undefined,
   mobilePhone: r.mobile_phone ?? undefined,
+  streetAddress: r.street_address ?? undefined,
   city: r.city ?? undefined,
+  state: r.state ?? undefined,
+  postalCode: r.postal_code ?? undefined,
   country: r.country ?? undefined,
   photoUrl: r.photo_url ?? undefined,
   groupIds: r.group_ids ?? [],
   customAttrs: r.custom_attrs ?? {},
+  extAttrs: r.extension_attrs ?? {},
   overrides: r.overrides ?? {},
   accountEnabled: r.account_enabled,
   lastSyncedAt: r.last_synced_at ? r.last_synced_at.toISOString() : null,
@@ -53,8 +61,8 @@ const toUser = (r: UserRow): DirectoryUser => ({
 
 const USER_SELECT = `
   u.id, u.email, u.aliases, u.display_name, u.given_name, u.surname, u.job_title, u.department, u.company_name,
-  u.office_location, u.business_phone, u.mobile_phone, u.city, u.country, null::text as photo_url,
-  u.custom_attrs, u.overrides, u.account_enabled, u.last_synced_at,
+  u.office_location, u.business_phone, u.mobile_phone, u.street_address, u.city, u.state, u.postal_code, u.country,
+  null::text as photo_url, u.custom_attrs, u.extension_attrs, u.overrides, u.account_enabled, u.last_synced_at,
   (select array_agg(gm.group_id) from group_members gm where gm.user_id = u.id) as group_ids`;
 
 interface TenantRow {
@@ -166,6 +174,12 @@ export function postgresData(db: Db): DataLayer {
                   ${tx.json((input.rule.exceptions ?? {}) as never)}, ${input.rule.appliesTo}, ${input.rule.enabled ?? true})`;
         return t.id;
       });
+    },
+    async updateTemplate(tenantId, templateId, input) {
+      const rows = await db.forTenant(tenantId, (tx) => tx`
+        update templates set name = ${input.name}, layout = ${tx.json(input.layout as never)}, version = version + 1
+        where id = ${templateId} returning id`);
+      if (rows.length === 0) throw new Error("template not found");
     },
   };
 }

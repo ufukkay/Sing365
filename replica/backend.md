@@ -13,6 +13,7 @@ Date: 2026-11-27. Reads `replica/architecture.md`.
 | Directory sync | `packages/graph`: client credentials, `/users/delta` + `/groups/delta` with members, paging, 429/5xx retry, expired delta -> full resync, consent errors -> tenant `revoked` | done, tested with a fake Graph |
 | Scheduled sync | `GET /api/cron/sync` with `CRON_SECRET` | done (schedule it every 4 h on the host) |
 | Add-in auth | Office SSO token (`OfficeRuntime.auth.getAccessToken`), verified server-side; manifest `WebApplicationInfo` | done in code; needs "Expose an API" in Entra |
+| Signatures from HTML | `/signatures/new`, `/signatures/[id]/edit`: the admin's own HTML with `{{field}}`, `{{field\|upper}}`, `{{#field}}…{{/field}}` and `{{^field}}…{{/field}}`; values escaped, result sanitised with an allow-list (`packages/render`) | done |
 | Payments (Stripe) | | not started |
 | Transactional email | | not started |
 | Photos to object storage | | not started |
@@ -21,7 +22,7 @@ Decision change from architecture.md: the `postgres` driver with SQL instead of 
 
 ## Local database (no account needed)
 
-`pnpm dev:local` starts a real PostgreSQL 17 from the `embedded-postgres` package (binaries for Windows, macOS and Linux come from npm), keeps its data in `.local-db/` (gitignored), creates a non-superuser `sing365_app` owner so row-level security applies as it does on Neon, runs the migrations and then `next dev` with `DATABASE_URL` pointing at it. It listens on localhost:54329 only. Ctrl+C stops both; delete `.local-db/` for an empty database. Production still uses a hosted database (Neon EU).
+`pnpm dev:local` starts a real PostgreSQL 17 from the `embedded-postgres` package (binaries for Windows, macOS and Linux come from npm), keeps its data in `.local-db/` (gitignored), creates a non-superuser `sing365_app` owner so row-level security applies as it does on Neon, runs the migrations and then `next dev` with `DATABASE_URL` pointing at it. It listens on localhost only, on the first free port of 15432, 25432, 35432 and 45432 (Windows reserves many higher ports). Ctrl+C stops both; delete `.local-db/` for an empty database. Production still uses a hosted database (Neon EU).
 
 ## Entra setup (development tenant)
 

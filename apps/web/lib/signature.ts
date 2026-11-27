@@ -15,10 +15,14 @@ export function fieldValues(u: DirectoryUser): FieldValues {
     email: u.email,
     business_phone: u.businessPhone,
     mobile_phone: u.mobilePhone,
+    street_address: u.streetAddress,
     city: u.city,
+    state: u.state,
+    postal_code: u.postalCode,
     country: u.country,
     photo_url: u.photoUrl,
   };
+  for (const [k, v] of Object.entries(u.extAttrs ?? {})) base[`ext.${k.toLowerCase()}`] = v;
   for (const [k, v] of Object.entries(u.customAttrs)) base[`custom.${k}`] = v;
   return { ...base, ...u.overrides };
 }

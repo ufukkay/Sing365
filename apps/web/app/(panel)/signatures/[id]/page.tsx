@@ -4,6 +4,7 @@ import { render } from "@sing365/render";
 import { Badge, Button, Card, PageHeader } from "@/components/ui";
 import { data } from "@/lib/data";
 import { requirePanel } from "@/lib/context";
+import { FIELD_HELP, htmlOf } from "@/lib/html-template";
 import { buildSignature, fieldValues } from "@/lib/signature";
 
 export const metadata = { title: "İmza önizleme" };
@@ -47,6 +48,8 @@ export default async function SignaturePreview({
   const groups = await data.listGroups(tenantId);
   /** The rules engine reports group ids; show the directory names instead. */
   const readable = (detail: string) => groups.reduce((s, g) => s.split(g.id).join(`"${g.displayName}"`), detail);
+  const fieldName = (key: string) => FIELD_HELP.find((f) => f.key === key)?.label ?? key;
+  const isHtml = htmlOf(template) !== null;
 
   return (
     <>
@@ -54,9 +57,16 @@ export default async function SignaturePreview({
         title={template.name}
         description="Bu imzanın seçilen kişide nasıl göründüğünü ve o kişinin gerçekte hangi imzayı aldığını gösterir."
         actions={
-          <Link href="/signatures" className="text-sm font-medium text-accent underline">
-            Tüm imzalar
-          </Link>
+          <div className="flex items-center gap-4">
+            {isHtml && (
+              <Link href={`/signatures/${template.id}/edit`} className="text-sm font-medium text-accent underline">
+                HTML'i düzenle
+              </Link>
+            )}
+            <Link href="/signatures" className="text-sm font-medium text-accent underline">
+              Tüm imzalar
+            </Link>
+          </div>
         }
       />
       <div className="grid gap-6 lg:grid-cols-[320px_1fr]">
@@ -99,7 +109,8 @@ export default async function SignaturePreview({
                 />
                 {preview.missing.length > 0 && (
                   <p className="mt-3 text-xs text-text-muted">
-                    Bu kişide boş olan alanlar (satırları gizlendi): {preview.missing.join(", ")}
+                    {isHtml ? "Bu kişide boş olan alanlar" : "Bu kişide boş olan alanlar (satırları gizlendi)"}:{" "}
+                    {preview.missing.map(fieldName).join(", ")}
                   </p>
                 )}
               </>

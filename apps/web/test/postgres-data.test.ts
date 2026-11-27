@@ -2,6 +2,7 @@ import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import postgres from "postgres";
 import { createDb, upsertTenantOnConsent, upsertUsers, type Db } from "@sing365/db";
 import { postgresData } from "../lib/data/postgres";
+import { htmlLayout, htmlOf, htmlProblems } from "../lib/html-template";
 import { buildSignature } from "../lib/signature";
 import { addStarterTemplates } from "../lib/starter";
 
@@ -75,5 +76,41 @@ describe.runIf(ADMIN_URL && APP_URL)("Postgres data layer + signature", () => {
     const reply = await buildSignature(data, { tenantId: tid, from: "mehmet@yeni.com.tr", mode: "reply", recipients: [] });
     expect(reply.ok && reply.html).toContain("Mehmet | Uzman");
     expect(reply.ok && reply.templateId).not.toBe(fullId);
+  });
+
+  it("saves an HTML signature, fills it with the person's address and bumps the version on edit", async () => {
+    const tid = (await upsertTenantOnConsent(db, "66666666-6666-4666-8666-666666666666", "Html A.Ş.")).id;
+    await db.forTenant(tid, (tx) =>
+      upsertUsers(tx, tid, [
+        {
+          entraObjectId: "00000000-0000-4000-8000-0000000000e1", email: "zeynep@html.com.tr", aliases: [],
+          displayName: "Zeynep", givenName: "Zeynep", surname: "Işık", jobTitle: null, department: null, companyName: null,
+          officeLocation: null, businessPhone: "+90 2", mobilePhone: null, streetAddress: "Kayalar Cd. 10", city: "Büyükçekmece",
+          state: "İstanbul", postalCode: "34537", country: "Türkiye",
+          managerEntraId: null, extensionAttrs: {}, accountEnabled: true, mailboxType: "user",
+        },
+      ]),
+    );
+    const data = postgresData(db);
+    const html = `<p><b>{{given_name}} {{surname|upper}}</b>{{#job_title}} | {{job_title}}{{/job_title}}</p>
+      <p>{{street_address}} {{postal_code}} {{city}} / {{state}}</p>
+      <p>T: {{business_phone}}{{#mobile_phone}} | M: {{mobile_phone}}{{/mobile_phone}}</p>`;
+    expect(htmlProblems("Talay", html)).toEqual([]);
+    const id = await data.createTemplateWithRule(tid, {
+      name: "Talay", kind: "signature", status: "published", layout: htmlLayout(html), priority: 50,
+      rule: { senders: { all: true }, recipients: { scope: "any" }, appliesTo: "both" },
+    });
+
+    const r = await buildSignature(data, { tenantId: tid, from: "zeynep@html.com.tr", mode: "new", recipients: [] });
+    expect(r.ok && r.templateId).toBe(id);
+    expect(r.ok && r.html).toContain("Zeynep IŞIK");
+    expect(r.ok && r.html).toContain("Kayalar Cd. 10 34537 Büyükçekmece / İstanbul");
+    expect(r.ok && r.html).not.toContain("M:");
+    expect(r.ok && r.html).not.toContain(" | ");
+
+    await data.updateTemplate(tid, id, { name: "Talay 2", layout: htmlLayout("<p>{{email}}</p>") });
+    const t = await data.getTemplate(tid, id);
+    expect(t && { name: t.name, version: t.version, html: htmlOf(t) }).toEqual({ name: "Talay 2", version: 2, html: "<p>{{email}}</p>" });
+    expect(await data.getTemplate(tenantId, id)).toBeNull();
   });
 });

@@ -16,6 +16,8 @@ export interface DirectoryUserInput {
   mobilePhone: string | null;
   streetAddress: string | null;
   city: string | null;
+  state?: string | null;
+  postalCode?: string | null;
   country: string | null;
   managerEntraId: string | null;
   extensionAttrs: Record<string, string>;
@@ -69,19 +71,19 @@ export async function upsertUsers(tx: Tx, tenantId: string, users: DirectoryUser
     await tx`
       insert into directory_users (
         tenant_id, entra_object_id, email, aliases, display_name, given_name, surname, job_title, department,
-        company_name, office_location, business_phone, mobile_phone, street_address, city, country,
+        company_name, office_location, business_phone, mobile_phone, street_address, city, state, postal_code, country,
         manager_entra_id, extension_attrs, account_enabled, mailbox_type, last_synced_at, deleted_at)
       values (
         ${tenantId}, ${u.entraObjectId}, ${u.email.toLowerCase()}, ${u.aliases.map((a) => a.toLowerCase())}::citext[],
         ${u.displayName}, ${u.givenName}, ${u.surname}, ${u.jobTitle}, ${u.department},
-        ${u.companyName}, ${u.officeLocation}, ${u.businessPhone}, ${u.mobilePhone}, ${u.streetAddress}, ${u.city}, ${u.country},
+        ${u.companyName}, ${u.officeLocation}, ${u.businessPhone}, ${u.mobilePhone}, ${u.streetAddress}, ${u.city}, ${u.state ?? null}, ${u.postalCode ?? null}, ${u.country},
         ${u.managerEntraId}, ${tx.json(u.extensionAttrs)}, ${u.accountEnabled}, ${u.mailboxType}, now(), null)
       on conflict (tenant_id, entra_object_id) do update set
         email = excluded.email, aliases = excluded.aliases, display_name = excluded.display_name,
         given_name = excluded.given_name, surname = excluded.surname, job_title = excluded.job_title,
         department = excluded.department, company_name = excluded.company_name, office_location = excluded.office_location,
         business_phone = excluded.business_phone, mobile_phone = excluded.mobile_phone, street_address = excluded.street_address,
-        city = excluded.city, country = excluded.country, manager_entra_id = excluded.manager_entra_id,
+        city = excluded.city, state = excluded.state, postal_code = excluded.postal_code, country = excluded.country, manager_entra_id = excluded.manager_entra_id,
         extension_attrs = excluded.extension_attrs, account_enabled = excluded.account_enabled,
         mailbox_type = excluded.mailbox_type, last_synced_at = now(), deleted_at = null`;
     n++;

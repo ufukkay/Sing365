@@ -31,11 +31,16 @@ export interface DirectoryUser {
   officeLocation?: string;
   businessPhone?: string;
   mobilePhone?: string;
+  streetAddress?: string;
   city?: string;
+  state?: string;
+  postalCode?: string;
   country?: string;
   photoUrl?: string;
   groupIds: string[];
   customAttrs: Record<string, string>;
+  /** On-premises extension attributes (extensionAttribute1..15), as {{ext.extensionAttribute1}}. */
+  extAttrs?: Record<string, string>;
   overrides: Record<string, string>;
   accountEnabled: boolean;
   lastSyncedAt: string | null;
@@ -88,4 +93,6 @@ export interface DataLayer {
   getSyncStatus(tenantId: string): Promise<SyncStatus>;
   /** Saves a template and its rule together. Returns the new template id. */
   createTemplateWithRule(tenantId: string, input: NewTemplate): Promise<string>;
+  /** Replaces a template's name and layout and bumps its version (the add-in re-fetches on a new version). */
+  updateTemplate(tenantId: string, templateId: string, input: { name: string; layout: Layout }): Promise<void>;
 }

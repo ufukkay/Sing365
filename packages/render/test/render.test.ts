@@ -116,3 +116,46 @@ describe("validateLayout", () => {
     ]);
   });
 });
+
+describe("html element", () => {
+  const html = (h: string): Layout => ({ ...layout, elements: [{ type: "html", html: h }] });
+
+  it("fills placeholders, upper-cases the Turkish way and keeps the admin's markup", () => {
+    const r = render(html('<table><tr><td style="color:#2d2926"><b>{{given_name}} {{surname|upper}}</b></td></tr></table>'), {
+      given_name: "Şirin",
+      surname: "çiğdem",
+    });
+    expect(r.html).toContain('<td style="color:#2d2926"><b>Şirin ÇİĞDEM</b></td>');
+    expect(r.text).toBe("Şirin ÇİĞDEM");
+  });
+
+  it("shows {{#field}} sections only when the field has a value, {{^field}} only when it is empty", () => {
+    const h = 'T: {{business_phone}}{{#mobile_phone}} | M: {{mobile_phone}}{{/mobile_phone}}{{^mobile_phone}} (no mobile){{/mobile_phone}}';
+    expect(render(html(h), { business_phone: "1", mobile_phone: "2" }).html).toContain("T: 1 | M: 2");
+    const none = render(html(h), { business_phone: "1", mobile_phone: "" }).html;
+    expect(none).toContain("T: 1 (no mobile)");
+    expect(none).not.toContain("M:");
+  });
+
+  it("removes scripts, event handlers and unsafe links, and escapes values", () => {
+    const r = render(
+      html('<a href="javascript:alert(1)" onclick="x()">a</a><script>alert(2)</script><img src="http://x/y.png" alt="l"><a href="{{custom.web}}">w</a><span>{{display_name}}</span>'),
+      { "custom.web": "javascript:alert(3)", display_name: "<b>x</b>" },
+    );
+    expect(r.html).not.toMatch(/javascript:|onclick|<script|alert\(2\)|http:\/\/x/);
+    expect(r.html).toContain("&lt;b&gt;x&lt;/b&gt;");
+  });
+
+  it("drops style declarations that could load content", () => {
+    const r = render(html('<td style="background:url(https://t.example/p.png)">a</td><span style="color:#ffb71b">b</span>'), {});
+    expect(r.html).not.toContain("url(");
+    expect(r.html).toContain('style="color:#ffb71b"');
+  });
+
+  it("flags unknown fields and scripts before publish", () => {
+    const errors = validateLayout(html("{{nope}} {{#also_nope}}x{{/also_nope}} <script></script>"));
+    expect(errors).toContain("Unknown field {{nope}}.");
+    expect(errors).toContain("Unknown field {{also_nope}}.");
+    expect(errors.some((e) => e.startsWith("Scripts"))).toBe(true);
+  });
+});

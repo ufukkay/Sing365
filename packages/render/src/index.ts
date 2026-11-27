@@ -5,7 +5,13 @@
  * into email-safe HTML and a plain-text twin. Rules (replica/design/components.md §5):
  * tables only, inline styles only, no web fonts, no SVG, images with width and
  * height, and a line whose placeholders are all empty is removed.
+ *
+ * An "html" element carries the admin's own HTML (for organisations that already
+ * have a signature design). Placeholders work there too, sections
+ * {{#field}}...{{/field}} show only when the field has a value ({{^field}} when it
+ * is empty), and the result is always passed through an allow-list sanitiser.
  */
+import sanitizeHtml from "sanitize-html";
 
 export type FieldValues = Record<string, string | null | undefined>;
 
@@ -22,7 +28,8 @@ export type Element =
   | { type: "divider"; color?: string }
   | { type: "spacer"; height: number }
   | { type: "social"; links: { network: string; url: string; icon: string; label: string }[]; size?: number }
-  | { type: "columns"; columns: { width?: number; elements: Element[] }[]; gap?: number };
+  | { type: "columns"; columns: { width?: number; elements: Element[] }[]; gap?: number }
+  | { type: "html"; html: string };
 
 export interface Layout {
   version: 1;
@@ -55,11 +62,15 @@ export const KNOWN_FIELDS = [
   "mobile_phone",
   "street_address",
   "city",
+  "state",
+  "postal_code",
   "country",
   "photo_url",
 ] as const;
 
-const PLACEHOLDER = /\{\{\s*([a-z][a-z0-9_.]*)\s*\}\}/gi;
+// {{field}} or {{field|upper}}; field names may contain dots (custom.x, ext.y).
+const PLACEHOLDER = /\{\{\s*([a-z][a-z0-9_.]*)\s*(?:\|\s*(upper|lower)\s*)?\}\}/gi;
+const SECTION = /\{\{\s*([#^])\s*([a-z][a-z0-9_.]*)\s*\}\}([\s\S]*?)\{\{\s*\/\s*\2\s*\}\}/gi;
 const HEX = /^#[0-9a-f]{6}$/i;
 const SAFE_URL = /^(https:\/\/|http:\/\/|mailto:|tel:)/i;
 
@@ -100,19 +111,96 @@ function value(ctx: Ctx, key: string): string {
   return v;
 }
 
-/** Fill placeholders. Returns null when the string had placeholders and every one was empty. */
-function fill(ctx: Ctx, s: string, escape: (x: string) => string): string | null {
+// Turkish casing (i/İ, ı/I) since most directories this serves are Turkish.
+function modify(v: string, mod: string | undefined): string {
+  if (mod === "upper") return v.toLocaleUpperCase("tr-TR");
+  if (mod === "lower") return v.toLocaleLowerCase("tr-TR");
+  return v;
+}
+
+/**
+ * Fill placeholders. Returns null when the string had placeholders and every one was empty.
+ * `literal` escapes the text around placeholders (identity for admin HTML), `escape` the values.
+ */
+function fill(ctx: Ctx, s: string, escape: (x: string) => string, literal: (x: string) => string = escape): string | null {
   const keys = placeholdersIn(s);
-  const filled = keys.map((k) => value(ctx, k));
-  if (keys.length > 0 && filled.every((v) => v === "")) return null;
-  return s
-    .split(PLACEHOLDER)
-    .map((part, idx) => {
-      // split with one capture group: even = literal, odd = key
-      if (idx % 2 === 0) return escape(part);
-      return escape(filled[keys.indexOf(part.toLowerCase())] ?? "");
-    })
-    .join("");
+  const filled = new Map(keys.map((k) => [k, value(ctx, k)]));
+  if (keys.length > 0 && [...filled.values()].every((v) => v === "")) return null;
+  let out = "";
+  let last = 0;
+  for (const m of s.matchAll(PLACEHOLDER)) {
+    out += literal(s.slice(last, m.index));
+    out += escape(modify(filled.get(m[1]!.toLowerCase()) ?? "", m[2]?.toLowerCase()));
+    last = m.index! + m[0].length;
+  }
+  return out + literal(s.slice(last));
+}
+
+/** Resolves {{#field}}..{{/field}} (shown when set) and {{^field}}..{{/field}} (shown when empty), innermost first. */
+function sections(ctx: Ctx, s: string): string {
+  let prev: string;
+  let out = s;
+  do {
+    prev = out;
+    out = out.replace(SECTION, (_m, kind: string, key: string, body: string) => {
+      const has = value(ctx, key.toLowerCase()) !== "";
+      return (kind === "#") === has ? body : "";
+    });
+  } while (out !== prev);
+  return out;
+}
+
+const SANITIZE: sanitizeHtml.IOptions = {
+  allowedTags: [
+    "table", "thead", "tbody", "tfoot", "tr", "td", "th", "caption", "colgroup", "col",
+    "div", "p", "span", "br", "hr", "a", "img", "b", "strong", "i", "em", "u", "s", "small", "sup", "sub", "font", "center",
+  ],
+  allowedAttributes: {
+    "*": ["style", "align", "valign", "width", "height", "bgcolor", "border", "dir", "title"],
+    a: ["href", "target", "name"],
+    img: ["src", "alt"],
+    table: ["cellpadding", "cellspacing", "role"],
+    td: ["colspan", "rowspan", "nowrap"],
+    th: ["colspan", "rowspan", "nowrap"],
+    font: ["color", "face", "size"],
+  },
+  allowedSchemes: ["https", "http", "mailto", "tel"],
+  allowedSchemesByTag: { img: ["https"] },
+  allowProtocolRelative: false,
+  disallowedTagsMode: "discard",
+  transformTags: {
+    // Drop style declarations that can load or run anything.
+    "*": (tagName, attribs) => {
+      if (attribs.style && /expression|url\s*\(|javascript:|behavior|@import/i.test(attribs.style)) {
+        const { style: _drop, ...rest } = attribs;
+        return { tagName, attribs: rest };
+      }
+      return { tagName, attribs };
+    },
+  },
+};
+
+/** Admin HTML with placeholders -> safe HTML. Values are escaped; the result is sanitised as a whole. */
+function renderHtml(ctx: Ctx, source: string): string {
+  const filled = fill(ctx, sections(ctx, source), escapeHtml, (x) => x) ?? "";
+  return sanitizeHtml(filled, SANITIZE).trim();
+}
+
+function htmlToText(html: string): string {
+  return html
+    .replace(/<br\s*\/?>/gi, "\n")
+    .replace(/<\/(tr|p|div|table)>/gi, "\n")
+    .replace(/<[^>]+>/g, "")
+    .replace(/&nbsp;/g, " ")
+    .replace(/&lt;/g, "<")
+    .replace(/&gt;/g, ">")
+    .replace(/&quot;/g, '"')
+    .replace(/&#39;/g, "'")
+    .replace(/&amp;/g, "&")
+    .split("\n")
+    .map((l) => l.replace(/[ \t]+/g, " ").trim())
+    .filter(Boolean)
+    .join("\n");
 }
 
 function safeColor(c: string | undefined, fallback: string): string {
@@ -201,6 +289,13 @@ function renderElement(ctx: Ctx, el: Element, text: string[]): string | null {
       if (cells.length === 0) return null;
       return row(`<table role="presentation" cellpadding="0" cellspacing="0" border="0"><tr>${cells.join("")}</tr></table>`);
     }
+    case "html": {
+      const html = renderHtml(ctx, el.html);
+      if (!html) return null;
+      const plain = htmlToText(html);
+      if (plain) text.push(plain);
+      return row(html);
+    }
     case "columns": {
       const gap = Math.max(0, Math.min(32, el.gap ?? 16));
       const cols = el.columns
@@ -249,6 +344,11 @@ export function validateLayout(layout: Layout): string[] {
       }
       if (el.type === "text") {
         for (const k of placeholdersIn(el.text)) if (!isKnown(k)) errors.push(`Unknown field {{${k}}}.`);
+      }
+      if (el.type === "html") {
+        for (const k of placeholdersIn(el.html)) if (!isKnown(k)) errors.push(`Unknown field {{${k}}}.`);
+        for (const m of el.html.matchAll(SECTION)) if (!isKnown(m[2]!.toLowerCase())) errors.push(`Unknown field {{${m[2]}}}.`);
+        if (/<script|\son[a-z]+\s*=|javascript:/i.test(el.html)) errors.push("Scripts and event handlers are removed from signatures.");
       }
       if (el.type === "columns") el.columns.forEach((c) => walk(c.elements));
     }
