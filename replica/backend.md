@@ -19,6 +19,10 @@ Date: 2026-11-27. Reads `replica/architecture.md`.
 
 Decision change from architecture.md: the `postgres` driver with SQL instead of Drizzle (the SQL schema is the source of truth; no second schema in TypeScript). Auth is a small in-house OIDC flow instead of Auth.js, because multi-tenant Entra issuer checks are simpler to get right directly.
 
+## Local database (no account needed)
+
+`pnpm dev:local` starts a real PostgreSQL 17 from the `embedded-postgres` package (binaries for Windows, macOS and Linux come from npm), keeps its data in `.local-db/` (gitignored), creates a non-superuser `sing365_app` owner so row-level security applies as it does on Neon, runs the migrations and then `next dev` with `DATABASE_URL` pointing at it. It listens on localhost:54329 only. Ctrl+C stops both; delete `.local-db/` for an empty database. Production still uses a hosted database (Neon EU).
+
 ## Entra setup (development tenant)
 
 - App registration "Sing365 (geliştirme)", multi-tenant, redirect `http://localhost:3000/api/auth/callback/microsoft-entra-id`.
