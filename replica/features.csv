@@ -1,0 +1,43 @@
+feature,area,priority,original,clone,notes
+Admin signs in with Microsoft Entra ID and grants tenant consent,onboarding,must,yes,no,multi-tenant app; Graph User.Read.All / Directory.Read.All
+Sync users and groups from Entra ID via Graph,directory,must,yes,no,scheduled delta sync
+Directory placeholders in templates (name title phone dept photo),designer,must,yes,no,
+Hide a line when its field is empty,designer,must,yes,no,native M365 cannot; key differentiator
+Drag-and-drop signature designer producing email-safe HTML,designer,must,yes,no,tables + inline CSS; test in Outlook desktop
+Live preview as a specific user,designer,must,yes,no,
+Multiple signature templates,signatures,must,yes,no,their Starter tier allows 1
+Assign signatures by user group or department,rules,must,yes,no,
+Different signature for new mail vs reply,rules,must,yes,no,
+Internal vs external recipient rules,rules,must,yes,no,
+Rule priority / order,rules,must,yes,no,
+Legal disclaimer,disclaimers,must,yes,no,
+Outlook add-in that inserts signature automatically on compose,delivery-client,must,yes,no,event-based activation; central deploy via Integrated Apps
+Add-in works on Outlook web Windows Mac and mobile,delivery-client,must,yes,no,
+Brand kit (logo colours social links),brand,must,yes,no,
+Billing per active mailbox with free trial,billing,must,yes,no,Stripe
+Server-side signature via Exchange Online connector and relay,delivery-server,should,yes,no,phase 2; covers native mail apps; appears in recipients copy
+Skip server-side when add-in already signed,delivery-server,should,yes,no,
+Pick another assigned signature in the add-in,delivery-client,should,yes,no,
+User-editable fields (self-service),users,should,yes,no,
+Extra custom attributes and CSV override upload,directory,should,yes,no,
+Promotional banners with date-range scheduling,campaigns,should,yes,no,
+Rotating banners,campaigns,should,yes,no,
+Rules tester (why did this sender get this signature),rules,should,yes,no,
+Exceptions (exclude users groups),rules,should,yes,no,
+Target by recipient email domain,rules,should,yes,no,
+Folders with delegated editors and roles,admin,should,yes,no,
+Audit log,admin,should,yes,no,
+Shared mailbox / send-as / alias handling,delivery-client,should,yes,no,
+Link click analytics for banners,analytics,could,yes,no,needs redirect tracking domain
+Signature usage analytics,analytics,could,yes,no,
+A/B testing of banners,analytics,could,yes,no,
+QR codes and vCard,designer,could,yes,no,
+Social feed element (latest posts),designer,could,yes,no,
+HRIS sync (e.g. Workday),directory,could,yes,no,
+CRM targeting (Salesforce HubSpot lists),rules,could,yes,no,official APIs only
+Diagnostics / message capture,support,could,yes,no,
+Headline content above message body,campaigns,could,yes,no,
+Meeting branding for Teams/Zoom,meetings,could,yes,skip,separate product area; out of v1 scope
+Google Workspace support,platform,could,yes,skip,v1 is Microsoft 365 only
+Exchange on-premises transport agent,platform,could,yes,skip,v1 is Microsoft 365 only
+Certifications and global datacenter footprint,trust,could,yes,skip,must be earned independently not cloned
