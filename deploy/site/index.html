@@ -1,0 +1,47 @@
+<!doctype html>
+<html lang="tr">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Sigwide · Microsoft 365 için merkezi e-posta imzası</title>
+<meta name="description" content="Sigwide, Microsoft 365 kullanan şirketlerin e-posta imzalarını tek yerden yönetir. İmza sunucu tarafında eklenir, telefondan giden postalarda da çalışır.">
+<style>
+  :root { --bg:#ffffff; --surface:#f5f7f8; --text:#121a21; --muted:#55606b; --accent:#0b6e69; --accent-hover:#085954; --border:#e2e6e9; }
+  @media (prefers-color-scheme: dark) { :root { --bg:#0f1418; --surface:#161d22; --text:#e9eef2; --muted:#a3afb9; --accent:#4fc2b9; --accent-hover:#6fd3cb; --border:#2a343c; } }
+  * { box-sizing: border-box; }
+  body { margin:0; font-family: "Segoe UI", system-ui, -apple-system, sans-serif; background:var(--bg); color:var(--text); line-height:1.55; }
+  header, main, footer { max-width: 960px; margin: 0 auto; padding: 24px; }
+  header { display:flex; align-items:center; justify-content:space-between; }
+  .logo { font-weight:700; font-size:1.25rem; color:var(--accent); text-decoration:none; }
+  .btn { display:inline-block; padding:10px 18px; border-radius:8px; background:var(--accent); color:var(--bg); font-weight:600; text-decoration:none; }
+  .btn:hover { background:var(--accent-hover); }
+  .link { color:var(--accent); font-weight:600; text-decoration:none; }
+  h1 { font-size: clamp(1.8rem, 4vw, 2.6rem); line-height:1.2; margin: 48px 0 16px; max-width: 18em; }
+  .lead { font-size:1.15rem; color:var(--muted); max-width: 40em; }
+  .grid { display:grid; grid-template-columns: repeat(auto-fit, minmax(240px, 1fr)); gap:16px; margin: 48px 0; }
+  .card { background:var(--surface); border:1px solid var(--border); border-radius:12px; padding:20px; }
+  .card h2 { font-size:1.05rem; margin:0 0 8px; }
+  .card p { margin:0; color:var(--muted); font-size:.95rem; }
+  footer { color:var(--muted); font-size:.85rem; border-top:1px solid var(--border); }
+</style>
+</head>
+<body>
+<header>
+  <a class="logo" href="/">Sigwide</a>
+  <a class="link" href="https://app.sigwide.online/">Yönetici girişi</a>
+</header>
+<main>
+  <h1>Şirketinizin bütün e-posta imzaları, tek yerden.</h1>
+  <p class="lead">Sigwide, Microsoft 365 kullanan şirketlerin e-posta imzalarını merkezden yönetir. İmza, posta Exchange Online'dan çıkarken sunucu tarafında eklenir: Outlook'tan, tarayıcıdan ya da telefondan, hangi cihazdan gönderilirse gönderilsin.</p>
+  <p><a class="btn" href="https://app.sigwide.online/">Panele giriş yap</a></p>
+  <div class="grid">
+    <div class="card"><h2>Bilgiler dizinden gelir</h2><p>Ad, unvan, departman ve telefon Microsoft Entra ID'den okunur. Kimse imzasını elle güncellemek zorunda kalmaz.</p></div>
+    <div class="card"><h2>Her cihazda aynı imza</h2><p>Eklenti yok. İmza sunucuda eklendiği için mobil uygulamalardan giden postalarda da çalışır.</p></div>
+    <div class="card"><h2>Kurallarla kim ne alır</h2><p>Departmana, gruba ya da yeni ileti ve yanıt ayrımına göre farklı imzalar tanımlayın.</p></div>
+  </div>
+</main>
+<footer>
+  <p>Sigwide · Microsoft 365 için e-posta imzası yönetimi. Microsoft, Microsoft 365 ve Exchange Online, Microsoft Corporation'ın ticari markalarıdır. Sigwide, Microsoft ile bağlantılı değildir.</p>
+</footer>
+</body>
+</html>

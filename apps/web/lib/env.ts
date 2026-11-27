@@ -10,6 +10,8 @@ export const env = {
   cronSecret: process.env.CRON_SECRET ?? "",
   /** Shared secret the Sigwide mail relay sends to /api/relay/sign (server-side signatures). */
   relaySecret: process.env.RELAY_SECRET ?? "",
+  /** Host name of the Sigwide mail relay, shown in the Exchange setup (smart host and certificate name). */
+  relayHost: process.env.SIGWIDE_RELAY_HOST ?? "",
   devAuth: process.env.SING365_DEV_AUTH === "1" && process.env.NODE_ENV !== "production",
 };
 

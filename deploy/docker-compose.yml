@@ -14,8 +14,10 @@ services:
     environment:
       SIGWIDE_HOST: ${SIGWIDE_HOST}
       SIGWIDE_RELAY_HOST: ${SIGWIDE_RELAY_HOST}
+      SIGWIDE_SITE_HOST: ${SIGWIDE_SITE_HOST}
     volumes:
       - ./Caddyfile:/etc/caddy/Caddyfile:ro
+      - ./site:/srv/site:ro
       - caddy_data:/data
       - caddy_config:/config
     depends_on: [web]
@@ -53,6 +55,7 @@ services:
       SESSION_SECRET: ${SESSION_SECRET}
       CRON_SECRET: ${CRON_SECRET}
       RELAY_SECRET: ${RELAY_SECRET}
+      SIGWIDE_RELAY_HOST: ${SIGWIDE_RELAY_HOST}
     logging: *logging
 
   relay:
