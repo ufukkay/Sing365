@@ -100,8 +100,115 @@ export function displayHost(url: string): string {
 const TEXT = "#1f2937";
 const MUTED = "#64748b";
 
-/** Turns the choices into designer blocks. */
-export function buildQuickLayout(config: QuickConfig): Layout {
+/** Ready-made signatures shown first when a new signature is created. Each sets the look; the
+ * admin's own logo, web site and links stay when switching between them. */
+export const QUICK_TEMPLATES: {
+  id: string;
+  title: string;
+  subtitle: string;
+  config: Pick<QuickConfig, "style" | "color" | "font" | "show"> & { social: QuickSocial[] };
+}[] = [
+  {
+    id: "corporate",
+    title: "Kurumsal",
+    subtitle: "Logo solda, ince çizgiyle ayrılmış bilgiler",
+    config: {
+      style: "side",
+      color: "#166b63",
+      font: QUICK_FONTS[0].value,
+      show: { job_title: true, department: false, company_name: true, business_phone: true, mobile_phone: true, email: true, address: false },
+      social: ["linkedin"],
+    },
+  },
+  {
+    id: "modern",
+    title: "Modern",
+    subtitle: "Logo üstte, sosyal medya simgeleriyle",
+    config: {
+      style: "logo-top",
+      color: "#1d4ed8",
+      font: QUICK_FONTS[1].value,
+      show: { job_title: true, department: false, company_name: true, business_phone: false, mobile_phone: true, email: true, address: false },
+      social: ["linkedin", "instagram", "x"],
+    },
+  },
+  {
+    id: "classic",
+    title: "Klasik",
+    subtitle: "Bilgiler ve adres üstte, logo altta",
+    config: {
+      style: "classic",
+      color: "#0f172a",
+      font: QUICK_FONTS[5].value,
+      show: { job_title: true, department: true, company_name: true, business_phone: true, mobile_phone: false, email: true, address: true },
+      social: [],
+    },
+  },
+  {
+    id: "simple",
+    title: "Sade",
+    subtitle: "Logosuz, kısa ve temiz",
+    config: {
+      style: "minimal",
+      color: "#475569",
+      font: QUICK_FONTS[2].value,
+      show: { job_title: true, department: false, company_name: false, business_phone: false, mobile_phone: true, email: true, address: false },
+      social: [],
+    },
+  },
+];
+
+/** Applies a ready-made look, keeping the admin's logo, web site, link addresses and footer. */
+export function applyQuickTemplate(config: QuickConfig, template: (typeof QUICK_TEMPLATES)[number]): QuickConfig {
+  const t = template.config;
+  const kept = config.social.filter((s) => s.url);
+  const social = [...kept, ...t.social.filter((n) => !kept.some((s) => s.network === n)).map((network) => ({ network, url: "" }))];
+  return { ...config, style: t.style, color: t.color, font: t.font, show: { ...t.show }, social };
+}
+
+/** The template whose look the choices match, if any. */
+export function matchingQuickTemplate(config: QuickConfig) {
+  return QUICK_TEMPLATES.find((t) => t.config.style === config.style && t.config.color === config.color && t.config.font === config.font);
+}
+
+/** Public images for signatures (social icons, preview logo), drawn by /api/signature-art. */
+export function artUrl(origin: string, name: string, color: string): string {
+  return `${origin}/api/signature-art/${name}-${color.replace("#", "").toLowerCase()}.png`;
+}
+
+const SAMPLE_WEBSITE = "https://www.firmaniz.com";
+const SAMPLE_SOCIAL: Record<QuickSocial, string> = {
+  linkedin: "https://www.linkedin.com/company/firmaniz",
+  x: "https://x.com/firmaniz",
+  instagram: "https://www.instagram.com/firmaniz",
+  facebook: "https://www.facebook.com/firmaniz",
+  youtube: "https://www.youtube.com/@firmaniz",
+};
+
+/** For previews only: fills a missing logo, web site and link addresses with examples, so the
+ * admin sees the finished look before entering their own. Never saved. */
+export function withSamples(config: QuickConfig, origin: string | null): { config: QuickConfig; used: boolean } {
+  let used = false;
+  const out = { ...config };
+  if (!out.logo && out.style !== "minimal" && origin) {
+    out.logo = { src: artUrl(origin, "sample-logo", out.color), naturalWidth: 480, naturalHeight: 144, width: 160 };
+    used = true;
+  }
+  if (!out.website) {
+    out.website = SAMPLE_WEBSITE;
+    used = true;
+  }
+  out.social = out.social.map((s) => {
+    if (s.url) return s;
+    used = true;
+    return { ...s, url: SAMPLE_SOCIAL[s.network] };
+  });
+  return { config: out, used };
+}
+
+/** Turns the choices into designer blocks. With `artOrigin`, social links are shown as round icons
+ * in the brand colour; without it, as text links. */
+export function buildQuickLayout(config: QuickConfig, artOrigin: string | null = null): Layout {
   const c = config;
   const show = c.show;
   const name: Element = { type: "text", text: "{{display_name}}", style: { size: 16, bold: true, color: c.color } };
@@ -123,9 +230,17 @@ export function buildQuickLayout(config: QuickConfig): Layout {
   if (show.address) {
     contact.push({ type: "text", text: "{{street_address}}, {{postal_code}} {{city}} / {{country}}", style: { size: 11, color: MUTED } });
   }
-  for (const s of c.social) {
-    const label = QUICK_SOCIAL.find((n) => n.id === s.network)?.label ?? s.network;
-    contact.push({ type: "text", text: label, href: s.url, style: { size: 12, bold: true, color: c.color } });
+  const social = c.social.filter((s) => s.url);
+  const label = (id: string) => QUICK_SOCIAL.find((n) => n.id === id)?.label ?? id;
+  if (social.length && artOrigin) {
+    contact.push({ type: "spacer", height: 4 });
+    contact.push({
+      type: "social",
+      size: 20,
+      links: social.map((s) => ({ network: s.network, label: label(s.network), url: s.url, icon: artUrl(artOrigin, s.network, c.color) })),
+    });
+  } else {
+    for (const s of social) contact.push({ type: "text", text: label(s.network), href: s.url, style: { size: 12, bold: true, color: c.color } });
   }
 
   const logo: Element | null = c.logo
@@ -235,8 +350,10 @@ export function parseQuickConfig(input: unknown, isImageUrl: (url: string) => bo
   const social = input.social.map((item) => {
     if (!isRecord(item)) throw new Error("Sosyal medya bağlantısı okunamadı.");
     const network = QUICK_SOCIAL.find((n) => n.id === item.network)?.id;
-    const url = httpsUrl(item.url);
     if (!network) throw new Error("Bilinmeyen sosyal ağ.");
+    // An empty address means "chosen but not filled in yet": kept, but not shown.
+    if (typeof item.url === "string" && !item.url.trim()) return { network, url: "" };
+    const url = httpsUrl(item.url);
     if (!url) throw new Error(`${QUICK_SOCIAL.find((n) => n.id === network)!.label} için https:// ile başlayan bir adres girin.`);
     return { network, url };
   });

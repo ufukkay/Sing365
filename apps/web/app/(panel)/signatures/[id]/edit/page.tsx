@@ -1,6 +1,7 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import { QuickSignatureEditor } from "@/components/quick-signature-editor";
+import { publicAssetOrigin } from "@/lib/public-origin";
 import { SignatureDesigner } from "@/components/signature-designer";
 import { Card, PageHeader } from "@/components/ui";
 import { requirePanel } from "@/lib/context";
@@ -57,7 +58,7 @@ export default async function EditSignature({
         <QuickSignatureEditor
           initial={{ id, name: template.name, config: quick, status: template.status, version: template.version }}
           action={saveVisualTemplateAction} preview={previewVisualTemplateAction}
-          sources={sources} advancedHref={`/signatures/${id}/edit?mode=advanced`}
+          sources={sources} artOrigin={publicAssetOrigin()} advancedHref={`/signatures/${id}/edit?mode=advanced`}
         />
       </>
     );

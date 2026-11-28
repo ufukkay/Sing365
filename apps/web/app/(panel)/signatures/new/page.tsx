@@ -1,5 +1,6 @@
 import Link from "next/link";
 import { QuickSignatureEditor } from "@/components/quick-signature-editor";
+import { publicAssetOrigin } from "@/lib/public-origin";
 import { SignatureDesigner } from "@/components/signature-designer";
 import { PageHeader } from "@/components/ui";
 import { requirePanel } from "@/lib/context";
@@ -39,7 +40,7 @@ export default async function NewSignature({ searchParams }: { searchParams: Pro
       ) : (
         <QuickSignatureEditor
           action={saveVisualTemplateAction} preview={previewVisualTemplateAction}
-          sources={sources} advancedHref="/signatures/new?mode=advanced"
+          sources={sources} artOrigin={publicAssetOrigin()} advancedHref="/signatures/new?mode=advanced"
         />
       )}
     </>

@@ -100,7 +100,8 @@ export function isSignatureImageUrl(value: string): boolean {
     const nodeEnv = (globalThis as { process?: { env?: { NODE_ENV?: string } } }).process?.env?.NODE_ENV;
     return nodeEnv !== "production" && url.protocol === "http:"
       && ["localhost", "127.0.0.1", "[::1]"].includes(url.hostname)
-      && /^\/api\/signature-assets\/[\da-f]{8}-[\da-f]{4}-4[\da-f]{3}-[89ab][\da-f]{3}-[\da-f]{12}$/i.test(url.pathname)
+      && (/^\/api\/signature-assets\/[\da-f]{8}-[\da-f]{4}-4[\da-f]{3}-[89ab][\da-f]{3}-[\da-f]{12}$/i.test(url.pathname)
+        || /^\/api\/signature-art\/[a-z-]+-[\da-f]{6}\.png$/.test(url.pathname))
       && !url.search && !url.hash;
   } catch {
     return false;
@@ -370,7 +371,7 @@ function renderElement(ctx: Ctx, el: Element, text: string[], defaultAlign?: Ali
         .map((s) => {
           const href = safeHref(ctx, s.url);
           const icon = safeHref(ctx, s.icon);
-          if (!href || !icon || !/^https:\/\//i.test(icon)) return null;
+          if (!href || !icon || !isSignatureImageUrl(icon)) return null;
           text.push(`${s.label}: ${href}`);
           return `<td style="padding:0 6px 0 0"><a href="${href}"><img src="${icon}" alt="${escapeHtml(s.label)}" width="${size}" height="${size}" style="display:block;border:0"></a></td>`;
         })

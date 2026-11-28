@@ -1,5 +1,6 @@
 import { isSignatureImageUrl, validateLayout, type Align, type Element, type FieldValues, type Layout, type TextStyle, type VAlign } from "@sing365/render";
 import type { Rule } from "@sing365/rules";
+import { publicAssetOrigin } from "./public-origin";
 import { buildQuickLayout, parseQuickConfig } from "./quick-signature";
 
 export const visualFields: { key: string; label: string; group: string }[] = [
@@ -274,7 +275,7 @@ export function parseVisualLayout(input: unknown): VisualLayoutResult {
     if (source.builder !== undefined) {
       const b = record(source.builder, "İmza düzenleyici bilgisi okunamadı.");
       if (b.kind !== "quick") throw new Error("İmza düzenleyici türü desteklenmiyor.");
-      const quick = buildQuickLayout(parseQuickConfig(b.config, isSignatureImageUrl));
+      const quick = buildQuickLayout(parseQuickConfig(b.config, isSignatureImageUrl), publicAssetOrigin());
       builder = quick.builder;
       source = quick as unknown as Record<string, unknown>;
     }

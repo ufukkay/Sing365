@@ -2,7 +2,7 @@
 
 import { useActionState, useEffect, useId, useMemo, useRef, useState } from "react";
 import Link from "next/link";
-import { Check, ImagePlus, Loader2, Save, Trash2 } from "lucide-react";
+import { ArrowLeft, ImagePlus, Loader2, Save, Trash2 } from "lucide-react";
 import type { FieldValues, Layout } from "@sing365/render";
 import {
   buildQuickLayout,
@@ -15,8 +15,11 @@ import {
   QUICK_FONTS,
   QUICK_SOCIAL,
   QUICK_STYLES,
+  QUICK_TEMPLATES,
+  applyQuickTemplate,
+  matchingQuickTemplate,
+  withSamples,
   type QuickConfig,
-  type QuickStyle,
 } from "@/lib/quick-signature";
 
 type Preview = { html: string; text: string; missing: string[] };
@@ -29,6 +32,8 @@ export interface QuickSignatureEditorProps {
   preview: (layout: Layout, values: FieldValues) => Promise<Preview>;
   /** Where "Gelişmiş düzenleyici" goes. */
   advancedHref: string;
+  /** Public origin for social icons and the preview logo; null shows social links as text. */
+  artOrigin: string | null;
 }
 
 const card = "rounded-lg border border-border bg-surface-raised p-4";
@@ -36,41 +41,99 @@ const stepTitle = "mb-3 flex items-center gap-2 text-sm font-semibold text-text"
 const stepNumber = "inline-flex size-6 items-center justify-center rounded-full bg-accent text-xs font-bold text-on-accent";
 const inputClass = "h-9 w-full rounded-md border border-border-input bg-bg px-3 text-sm text-text placeholder:text-text-muted";
 
-/** A tiny drawing of each style, so the admin sees the shape before choosing. */
-function StyleSketch({ style, color }: { style: QuickStyle; color: string }) {
-  const bar = (w: string, strong = false) => (
-    <span className="block h-1.5 rounded-sm" style={{ width: w, background: strong ? color : "var(--s365-color-border)" }} />
-  );
-  const logo = <span className="block h-5 w-8 rounded-sm" style={{ background: color, opacity: 0.35 }} />;
-  const lines = (
-    <span className="flex flex-col gap-1">
-      {bar("70%", true)}
-      {bar("55%")}
-      {bar("40%")}
-    </span>
-  );
-  if (style === "side") {
-    return (
-      <span className="flex items-center gap-2">
-        {logo}
-        <span className="h-8 w-px" style={{ background: color }} />
-        <span className="flex-1">{lines}</span>
-      </span>
-    );
-  }
-  if (style === "classic") return <span className="flex flex-col gap-1.5">{lines}{logo}</span>;
-  if (style === "logo-top") return <span className="flex flex-col gap-1.5">{logo}{lines}</span>;
+/** The signature rendered for one person, in a sandboxed frame. */
+function PreviewFrame({ html, height, title }: { html: string; height: number; title: string }) {
   return (
-    <span className="flex flex-col gap-1">
-      {bar("70%", true)}
-      {bar("50%")}
-      <span className="my-0.5 block h-px w-full" style={{ background: color }} />
-      {bar("60%")}
-    </span>
+    <iframe
+      title={title}
+      sandbox=""
+      className="w-full"
+      style={{ height }}
+      srcDoc={`<!doctype html><html><body style="margin:0;background:#fff">${html}</body></html>`}
+    />
   );
 }
 
-export function QuickSignatureEditor({ initial, sources, action, preview, advancedHref }: QuickSignatureEditorProps) {
+/** First screen of a new signature: four finished examples to start from. */
+function TemplateGallery({
+  config,
+  values,
+  preview,
+  artOrigin,
+  onPick,
+  onCancel,
+}: {
+  config: QuickConfig;
+  values: FieldValues;
+  preview: QuickSignatureEditorProps["preview"];
+  artOrigin: string | null;
+  onPick: (template: (typeof QUICK_TEMPLATES)[number]) => void;
+  onCancel?: () => void;
+}) {
+  const [html, setHtml] = useState<Record<string, string>>({});
+  useEffect(() => {
+    let live = true;
+    for (const t of QUICK_TEMPLATES) {
+      const look = withSamples(applyQuickTemplate(config, t), artOrigin).config;
+      preview(buildQuickLayout(look, artOrigin), values)
+        .then((r) => live && setHtml((h) => ({ ...h, [t.id]: r.html })))
+        .catch(() => undefined);
+    }
+    return () => {
+      live = false;
+    };
+  }, [config, values, preview, artOrigin]);
+
+  return (
+    <section aria-labelledby="quick-gallery-title" className="flex flex-col gap-4">
+      <div className="flex flex-wrap items-end justify-between gap-2">
+        <div>
+          <h2 id="quick-gallery-title" className="text-base font-semibold text-text">Bir örnek seçin</h2>
+          <p className="text-sm text-text-muted">
+            Seçtiğiniz örneğin logosunu, rengini, bilgilerini ve bağlantılarını sonraki adımda değiştirebilirsiniz.
+          </p>
+        </div>
+        {onCancel && (
+          <button type="button" onClick={onCancel} className="inline-flex items-center gap-1 text-sm font-medium text-accent hover:underline">
+            <ArrowLeft size={14} /> Düzenlemeye dön
+          </button>
+        )}
+      </div>
+      <div className="grid gap-4 md:grid-cols-2">
+        {QUICK_TEMPLATES.map((t) => (
+          <button
+            key={t.id}
+            type="button"
+            onClick={() => onPick(t)}
+            className="group flex flex-col overflow-hidden rounded-lg border border-border bg-surface-raised text-left transition-colors hover:border-accent focus-visible:border-accent"
+          >
+            <div className="pointer-events-none border-b border-border bg-white p-4">
+              {html[t.id] ? (
+                <PreviewFrame html={html[t.id]!} height={190} title={`${t.title} örneği`} />
+              ) : (
+                <p className="flex h-[190px] items-center justify-center text-sm text-gray-500">Hazırlanıyor…</p>
+              )}
+            </div>
+            <div className="flex items-center justify-between gap-3 p-3">
+              <span>
+                <span className="block text-sm font-semibold text-text">{t.title}</span>
+                <span className="block text-xs text-text-muted">{t.subtitle}</span>
+              </span>
+              <span className="shrink-0 rounded-md bg-accent px-3 py-1.5 text-xs font-semibold text-on-accent opacity-90 group-hover:opacity-100">
+                Bu örnekle başla
+              </span>
+            </div>
+          </button>
+        ))}
+      </div>
+      <p className="text-xs text-text-muted">
+        Örneklerde sizin dizin bilgileriniz, örnek bir logo ve örnek bağlantılar gösteriliyor.
+      </p>
+    </section>
+  );
+}
+
+export function QuickSignatureEditor({ initial, sources, action, preview, advancedHref, artOrigin }: QuickSignatureEditorProps) {
   const uid = useId();
   const [name, setName] = useState(initial?.name ?? "");
   const [config, setConfig] = useState<QuickConfig>(initial?.config ?? DEFAULT_QUICK_CONFIG);
@@ -81,14 +144,19 @@ export function QuickSignatureEditor({ initial, sources, action, preview, advanc
   const [formState, submit, saving] = useActionState(action, { errors: [] });
   const fileRef = useRef<HTMLInputElement>(null);
 
-  const layout = useMemo(() => buildQuickLayout(config), [config]);
+  const [choosing, setChoosing] = useState(!initial);
+  const layout = useMemo(() => buildQuickLayout(config, artOrigin), [config, artOrigin]);
+  const sample = useMemo(() => withSamples(config, artOrigin), [config, artOrigin]);
+  const previewLayout = useMemo(() => buildQuickLayout(sample.config, artOrigin), [sample, artOrigin]);
+  const current = matchingQuickTemplate(config);
+  const styleTitle = QUICK_STYLES.find((s) => s.id === config.style)?.title ?? "";
   const set = (patch: Partial<QuickConfig>) => setConfig((c) => ({ ...c, ...patch }));
 
   // Preview with the same renderer as sent mail (debounced).
   useEffect(() => {
     let live = true;
     const timer = setTimeout(() => {
-      preview(layout, sources[source]?.values ?? {})
+      preview(previewLayout, sources[source]?.values ?? {})
         .then((r) => live && setResult(r))
         .catch(() => live && setResult(null));
     }, 250);
@@ -96,7 +164,7 @@ export function QuickSignatureEditor({ initial, sources, action, preview, advanc
       live = false;
       clearTimeout(timer);
     };
-  }, [layout, preview, source, sources]);
+  }, [previewLayout, preview, source, sources]);
 
   async function upload(file: File) {
     setUploadError("");
@@ -120,6 +188,23 @@ export function QuickSignatureEditor({ initial, sources, action, preview, advanc
   }
 
   const socialOn = (id: string) => config.social.some((s) => s.network === id);
+
+  if (choosing) {
+    return (
+      <TemplateGallery
+        config={config}
+        values={sources[0]?.values ?? {}}
+        preview={preview}
+        artOrigin={artOrigin}
+        onCancel={initial || name ? () => setChoosing(false) : undefined}
+        onPick={(t) => {
+          setConfig((c) => applyQuickTemplate(c, t));
+          if (!name.trim()) setName(`${t.title} imza`);
+          setChoosing(false);
+        }}
+      />
+    );
+  }
 
   return (
     <form action={submit} className="grid gap-4 lg:grid-cols-[minmax(0,420px)_minmax(0,1fr)]">
@@ -148,36 +233,19 @@ export function QuickSignatureEditor({ initial, sources, action, preview, advanc
           />
         </div>
 
-        <section className={card} aria-labelledby={`${uid}-s1`}>
-          <h2 id={`${uid}-s1`} className={stepTitle}>
-            <span className={stepNumber}>1</span> Düzen seçin
-          </h2>
-          <div className="grid grid-cols-2 gap-2">
-            {QUICK_STYLES.map((s) => {
-              const active = config.style === s.id;
-              return (
-                <button
-                  key={s.id}
-                  type="button"
-                  aria-pressed={active}
-                  onClick={() => set({ style: s.id })}
-                  className={`relative flex flex-col gap-2 rounded-md border p-3 text-left transition-colors ${
-                    active ? "border-accent bg-accent-subtle" : "border-border bg-bg hover:bg-surface"
-                  }`}
-                >
-                  {active && <Check aria-hidden className="absolute right-2 top-2 size-4 text-accent" />}
-                  <StyleSketch style={s.id} color={config.color} />
-                  <span className="text-sm font-semibold text-text">{s.title}</span>
-                  <span className="-mt-1.5 text-xs text-text-muted">{s.subtitle}</span>
-                </button>
-              );
-            })}
-          </div>
-        </section>
+        <div className={`${card} flex flex-wrap items-center justify-between gap-2`}>
+          <p className="text-sm text-text">
+            <span className="text-text-muted">Görünüm: </span>
+            <span className="font-semibold">{current?.title ?? styleTitle}</span>
+          </p>
+          <button type="button" onClick={() => setChoosing(true)} className="text-sm font-medium text-accent hover:underline">
+            Başka örnek seç
+          </button>
+        </div>
 
         <section className={card} aria-labelledby={`${uid}-s2`}>
           <h2 id={`${uid}-s2`} className={stepTitle}>
-            <span className={stepNumber}>2</span> Marka
+            <span className={stepNumber}>1</span> Marka
           </h2>
           {config.style !== "minimal" && (
             <div className="mb-4">
@@ -266,7 +334,7 @@ export function QuickSignatureEditor({ initial, sources, action, preview, advanc
 
         <section className={card} aria-labelledby={`${uid}-s3`}>
           <h2 id={`${uid}-s3`} className={stepTitle}>
-            <span className={stepNumber}>3</span> Gösterilecek bilgiler
+            <span className={stepNumber}>2</span> Gösterilecek bilgiler
           </h2>
           <p className="mb-3 text-xs text-text-muted">
             Ad soyad her zaman görünür. Bilgiler her çalışanın Microsoft 365 kaydından gelir; boş olanlar kendiliğinden gizlenir.
@@ -288,7 +356,7 @@ export function QuickSignatureEditor({ initial, sources, action, preview, advanc
 
         <section className={card} aria-labelledby={`${uid}-s4`}>
           <h2 id={`${uid}-s4`} className={stepTitle}>
-            <span className={stepNumber}>4</span> Web sitesi ve sosyal medya <span className="font-normal text-text-muted">(isteğe bağlı)</span>
+            <span className={stepNumber}>3</span> Web sitesi ve sosyal medya <span className="font-normal text-text-muted">(isteğe bağlı)</span>
           </h2>
           <label htmlFor={`${uid}-web`} className="mb-1.5 block text-sm font-medium text-text">
             Web sitesi
@@ -339,7 +407,7 @@ export function QuickSignatureEditor({ initial, sources, action, preview, advanc
 
         <section className={card} aria-labelledby={`${uid}-s5`}>
           <h2 id={`${uid}-s5`} className={stepTitle}>
-            <span className={stepNumber}>5</span> Alt bilgi <span className="font-normal text-text-muted">(isteğe bağlı)</span>
+            <span className={stepNumber}>4</span> Alt bilgi <span className="font-normal text-text-muted">(isteğe bağlı)</span>
           </h2>
           <textarea
             aria-label="Alt bilgi metni"
@@ -379,6 +447,11 @@ export function QuickSignatureEditor({ initial, sources, action, preview, advanc
               <p className="py-16 text-center text-sm text-gray-500">Önizleme hazırlanıyor…</p>
             )}
           </div>
+          {sample.used && (
+            <p className="mt-2 text-xs text-text-muted">
+              Önizlemede eksik logo, web sitesi veya sosyal medya adresleri için örnek gösteriliyor; bunlar kaydedilmez.
+            </p>
+          )}
           {result && result.missing.length > 0 && (
             <p className="mt-2 text-xs text-text-muted">Bu kişide boş olduğu için gizlenen bilgiler var; diğer çalışanlarda dolu ise görünür.</p>
           )}

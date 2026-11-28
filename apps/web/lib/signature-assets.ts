@@ -16,19 +16,7 @@ interface ImageInfo {
   height: number;
 }
 
-export function signatureAssetOrigin(): string | null {
-  try {
-    const url = new URL(env.publicUrl);
-    if (url.username || url.password || url.pathname !== "/" || url.search || url.hash) return null;
-    if (url.protocol === "https:") return url.origin;
-    if (process.env.NODE_ENV !== "production" && url.protocol === "http:" && LOOPBACK_HOSTS.has(url.hostname)) {
-      return url.origin;
-    }
-  } catch {
-    return null;
-  }
-  return null;
-}
+export { publicAssetOrigin as signatureAssetOrigin } from "./public-origin";
 
 function jpegDimensions(bytes: Buffer): ImageInfo | null {
   let offset = 2;

@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 import { render } from "@sing365/render";
-import { buildQuickLayout, DEFAULT_QUICK_CONFIG, quickConfigOf, type QuickConfig } from "../lib/quick-signature";
+import { applyQuickTemplate, buildQuickLayout, DEFAULT_QUICK_CONFIG, matchingQuickTemplate, QUICK_TEMPLATES, quickConfigOf, withSamples, type QuickConfig } from "../lib/quick-signature";
+import { artPng } from "../lib/signature-art";
 import { parseVisualLayout } from "../lib/visual-signature";
 
 const person = {
@@ -71,5 +72,57 @@ describe("quick signature", () => {
     expect(bad({ logo: { ...logo, src: "http://evil.example/x.png" } })).toMatch(/Logoyu/);
     expect(bad({ disclaimer: "{{email}}" })).toMatch(/\{\{ \}\}/);
     expect(bad({ font: "Comic Sans" })).toMatch(/yazı tipi/);
+  });
+});
+
+describe("ready-made examples and social icons", () => {
+  it("shows social links as brand-coloured icons when the panel address is known", () => {
+    const built = buildQuickLayout(config({ color: "#1d4ed8", social: [{ network: "linkedin", url: "https://www.linkedin.com/company/pera" }] }), "https://app.sigwide.example");
+    const r = render(built, person);
+    expect(r.html).toContain('src="https://app.sigwide.example/api/signature-art/linkedin-1d4ed8.png"');
+    expect(r.html).toContain('href="https://www.linkedin.com/company/pera"');
+    expect(parseVisualLayout(JSON.parse(JSON.stringify(built))).errors).toEqual([]);
+  });
+
+  it("keeps a chosen network without an address but does not show it", () => {
+    const built = buildQuickLayout(config({ social: [{ network: "x", url: "" }] }), "https://app.sigwide.example");
+    const parsed = parseVisualLayout(JSON.parse(JSON.stringify(built)));
+    expect(parsed.errors).toEqual([]);
+    expect(quickConfigOf(parsed.layout)?.social).toEqual([{ network: "x", url: "" }]);
+    expect(render(parsed.layout!, person).html).not.toContain("signature-art");
+  });
+
+  it("switching examples changes the look but keeps the logo, web site and filled links", () => {
+    const mine = config({ logo, website: "https://pera.example", social: [{ network: "facebook", url: "https://facebook.com/pera" }] });
+    for (const t of QUICK_TEMPLATES) {
+      const next = applyQuickTemplate(mine, t);
+      expect(next.style).toBe(t.config.style);
+      expect(next.logo).toEqual(logo);
+      expect(next.website).toBe("https://pera.example");
+      expect(next.social[0]).toEqual({ network: "facebook", url: "https://facebook.com/pera" });
+      expect(matchingQuickTemplate(next)?.id).toBe(t.id);
+      const built = buildQuickLayout(withSamples(next, "https://app.sigwide.example").config, "https://app.sigwide.example");
+      expect(parseVisualLayout(JSON.parse(JSON.stringify(built))).errors).toEqual([]);
+    }
+  });
+
+  it("fills only the preview with a sample logo and links", () => {
+    const { config: filled, used } = withSamples(config({ social: [{ network: "linkedin", url: "" }] }), "https://app.sigwide.example");
+    expect(used).toBe(true);
+    expect(filled.logo?.src).toBe("https://app.sigwide.example/api/signature-art/sample-logo-166b63.png");
+    expect(filled.social[0]!.url).toMatch(/^https:\/\/www\.linkedin\.com\//);
+    expect(withSamples(config({ logo, website: "https://pera.example" }), null).used).toBe(false);
+  });
+});
+
+describe("signature art", () => {
+  it("draws valid PNG files only for known names", () => {
+    const png = artPng("instagram-0f172a.png")!;
+    expect(png.subarray(1, 4).toString()).toBe("PNG");
+    expect(png.readUInt32BE(16)).toBe(60);
+    expect(artPng("sample-logo-166b63.png")!.readUInt32BE(16)).toBe(480);
+    for (const bad of ["instagram-0f172a.svg", "tiktok-000000.png", "linkedin-12345.png", "../linkedin-000000.png", "linkedin-ABCDEF.png"]) {
+      expect(artPng(bad)).toBeNull();
+    }
   });
 });
