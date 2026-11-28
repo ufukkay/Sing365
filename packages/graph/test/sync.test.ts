@@ -1,7 +1,7 @@
 import { afterAll, beforeAll, beforeEach, describe, expect, it } from "vitest";
 import postgres from "postgres";
 import { createDb, upsertTenantOnConsent, type Db } from "@sing365/db";
-import { GraphClient, mapUser, syncTenant, USERS_DELTA_START, GROUPS_DELTA_START } from "../src/index";
+import { GraphClient, GraphError, mapUser, syncTenant, USERS_DELTA_START, GROUPS_DELTA_START } from "../src/index";
 
 /**
  * Integration test against a real Postgres. Needs:
@@ -135,6 +135,19 @@ describe.runIf(ADMIN_URL && APP_URL)("syncTenant against Postgres", () => {
     expect(t!.consent_status).toBe("revoked");
   });
 
+  it("keeps consent when only Sigwide's own client secret is wrong", async () => {
+    const impl = (async () =>
+      Response.json(
+        { error: "invalid_client", error_description: "AADSTS7000215: Invalid client secret provided.", error_codes: [7000215] },
+        { status: 401 },
+      )) as typeof fetch;
+    const graph = new GraphClient("tid", { clientId: "c", clientSecret: "wrong" }, impl);
+    const r = await syncTenant(db, graph, tenantId);
+    expect(r.ok).toBe(false);
+    const [t] = await db.sql`select consent_status from tenants where id = ${tenantId}`;
+    expect(t!.consent_status).toBe("granted");
+  });
+
   it("row level security hides another tenant's rows", async () => {
     const other = (await upsertTenantOnConsent(db, "22222222-2222-4222-8222-222222222222", "Başka Ltd")).id;
     const { impl } = fakeFetch({
@@ -146,6 +159,15 @@ describe.runIf(ADMIN_URL && APP_URL)("syncTenant against Postgres", () => {
     const theirs = await db.forTenant(other, (tx) => tx`select count(*)::int as n from directory_users`);
     const none = await db.sql`select count(*)::int as n from directory_users`;
     expect([mine[0]!.n, theirs[0]!.n, none[0]!.n]).toEqual([1, 0, 0]);
+  });
+});
+
+describe("GraphError", () => {
+  it("tells a wrong or expired client secret apart from removed consent", () => {
+    expect(new GraphError("x", 401, "invalid_client", [7000215]).isConsentProblem).toBe(false);
+    expect(new GraphError("x", 401, "invalid_client", [7000222]).isCredentialProblem).toBe(true);
+    expect(new GraphError("x", 400, "unauthorized_client", [700016]).isConsentProblem).toBe(true);
+    expect(new GraphError("x", 403, "Authorization_RequestDenied").isConsentProblem).toBe(true);
   });
 });
 

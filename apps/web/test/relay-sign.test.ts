@@ -43,4 +43,17 @@ describe("POST /api/relay/sign", () => {
     const body = await (await call({ key, from: "ayse.yilmaz@example.com", skip: true })).json();
     expect(body).toEqual({ signature: null, returnDomain: "example.com" });
   });
+
+  it("lets mail through unsigned (instead of bouncing it) when the tenant's consent is no longer granted", async () => {
+    const { data } = await import("../lib/data");
+    const tenant = (await data.getTenantByRelayKey(key))!;
+    tenant.consentStatus = "revoked";
+    try {
+      const res = await call({ key, from: "ayse.yilmaz@example.com", mode: "new" });
+      expect(res.status).toBe(200);
+      expect(await res.json()).toEqual({ signature: null, returnDomain: "example.com" });
+    } finally {
+      tenant.consentStatus = "granted";
+    }
+  });
 });

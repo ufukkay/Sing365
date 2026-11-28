@@ -9,6 +9,8 @@ const errors: Record<string, string> = {
   state: "Oturum süresi doldu, lütfen tekrar deneyin.",
   tenant_mismatch: "İzin, giriş yaptığınız kuruluş için verilmedi.",
   no_database: "Sunucu yapılandırması eksik (veritabanı).",
+  consent_not_found: "Microsoft henüz izni onaylamadı. Bir dakika bekleyip tekrar deneyin.",
+  not_admin: "Bu kuruluş zaten Sigwide'a bağlı. Panele erişim için mevcut bir yöneticinin sizi eklemesi gerekir.",
 };
 
 export default async function Onboarding({ searchParams }: { searchParams: Promise<{ error?: string }> }) {
