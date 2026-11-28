@@ -53,6 +53,8 @@ import {
   cloneNodeWithPrefix,
   columnLanes,
   computeMissing,
+  appendFieldToText,
+  columnsToLine,
   extensionKey,
   extensionName,
   extensionShort,
@@ -63,6 +65,7 @@ import {
   laneKey,
   locate,
   makeColumns,
+  mergeWithNext,
   normalizeSearch,
   readField,
   resizeColumns,
@@ -1014,6 +1017,12 @@ export function SignatureDesigner({ initial, sources, action, preview, fields, e
   const [selectedId, setSelectedId] = useState<string>();
   const [selectedLane, setSelectedLane] = useState<Lane>(null);
   const [selectedColTab, setSelectedColTab] = useState<number>(0);
+  // Clicking a field while a text line is selected adds it to that line (e.g. Ad + Soyad on one line).
+  const [lineSep, setLineSep] = useState<string>(INLINE_SEPARATORS[0]!.value);
+  const [addToLine, setAddToLine] = useState(true);
+  const [outlineOpen, setOutlineOpen] = useState(false);
+  // A line just added from the field list is selected, but is not a target for the next field until clicked.
+  const [justAddedId, setJustAddedId] = useState<string>();
   const [outlineFilter, setOutlineFilter] = useState<Record<string, number | "all">>({});
   const [showGuides, setShowGuides] = useState(false);
   const [query, setQuery] = useState("");
@@ -1093,6 +1102,22 @@ export function SignatureDesigner({ initial, sources, action, preview, fields, e
   const canvasWidth = layout.maxWidth ?? 800;
   const profile = sources[source]?.values ?? {};
   const selected = selectedId ? locate(nodes, selectedId) : undefined;
+  const selectedTextNode =
+    selected && selected.node.id !== justAddedId && "value" in selected.node && selected.node.value.type === "text"
+      ? (selected.node as { id: string; value: Extract<Leaf, { type: "text" }> })
+      : undefined;
+  const joinTarget = addToLine ? selectedTextNode : undefined;
+  const lineCandidate = selected && "columns" in selected.node ? columnsToLine(selected.node, lineSep) : null;
+  const mergeCandidate = selectedTextNode ? mergeWithNext(nodes, selectedTextNode.id, lineSep) : null;
+
+  /** Adds a field: to the selected text line when there is one, otherwise as a new line. */
+  function addField(key: string, value: Insert) {
+    if (joinTarget) {
+      updateNode({ id: joinTarget.id, value: appendFieldToText(joinTarget.value, key, lineSep) });
+      return;
+    }
+    setJustAddedId(append(value));
+  }
   const moveOptions = useMemo(
     () => [{ lane: null, index: nodes.length, key: "root", label: "Ana satır (tam genişlik)" }, ...columnLanes(nodes)],
     [nodes],
@@ -1189,12 +1214,13 @@ export function SignatureDesigner({ initial, sources, action, preview, fields, e
   }, [nodes, redo, selectedId, undo]);
 
   function select(node: Node, lane: Lane, columnIndex?: number) {
+    setJustAddedId(undefined);
     setSelectedId(node.id);
     setSelectedLane(lane);
     if (columnIndex !== undefined) setSelectedColTab(columnIndex);
   }
 
-  function append(value: Insert, zone?: Zone) {
+  function append(value: Insert, zone?: Zone): string {
     const lane = zone ? (value.type === "columns" ? null : zone.lane) : value.type === "columns" ? null : selectedLane;
     counter.current++;
     const node = toNodes([value], `added-${counter.current}`)[0]!;
@@ -1204,6 +1230,7 @@ export function SignatureDesigner({ initial, sources, action, preview, fields, e
     } else {
       select(node, lane);
     }
+    return node.id;
   }
 
   function applyStarter(elements: Layout["elements"]) {
@@ -2082,6 +2109,26 @@ export function SignatureDesigner({ initial, sources, action, preview, fields, e
               </button>
             </div>
 
+            {selectedTextNode && (
+              <div className={styles.lineJoinBanner} role="status">
+                <label className={styles.lineJoinToggle}>
+                  <input type="checkbox" checked={addToLine} onChange={(e) => setAddToLine(e.target.checked)} />
+                  <span>
+                    Seçili satıra ekle
+                    <small>Tıkladığınız alan aynı satırın sonuna gelir. Kapalıysa yeni satır olur.</small>
+                  </span>
+                </label>
+                {addToLine && (
+                  <div className={styles.segmented} role="group" aria-label="Alanlar arası ayraç">
+                    {INLINE_SEPARATORS.map((item) => (
+                      <button key={item.value} type="button" aria-pressed={lineSep === item.value} onClick={() => setLineSep(item.value)}>
+                        {item.label}
+                      </button>
+                    ))}
+                  </div>
+                )}
+              </div>
+            )}
             {paletteTab === "entra" ? (
               <>
                 <label className={styles.search} htmlFor="sigwide-field-search">
@@ -2109,7 +2156,8 @@ export function SignatureDesigner({ initial, sources, action, preview, fields, e
                             draggable
                             onDragStart={(event) => dragStart(event, { value })}
                             onDragEnd={dragEnd}
-                            onClick={() => append(value)}
+                            onClick={() => addField(field.key, value)}
+                            title={joinTarget ? "Seçili satıra ekle" : "Yeni satır olarak ekle"}
                           >
                             <span>{field.label}</span>
                             <Plus size={14} />
@@ -2141,7 +2189,11 @@ export function SignatureDesigner({ initial, sources, action, preview, fields, e
                           draggable
                           onDragStart={(event) => dragStart(event, { value: insertValue })}
                           onDragEnd={dragEnd}
-                          onClick={() => insertCustomField(item)}
+                          onClick={() =>
+                            joinTarget && item.source === "entra" && item.entraKey
+                              ? addField(item.entraKey, insertValue)
+                              : insertCustomField(item)
+                          }
                         >
                           <span className={styles.customFieldTitle}>
                             {item.label}
@@ -2294,7 +2346,15 @@ export function SignatureDesigner({ initial, sources, action, preview, fields, e
           <section className={styles.outlinePanel} aria-label="Sıralama ve satır düzeni">
             <div className={styles.panelHead}>
               <h2>
-                <Layers size={16} /> Sıralama ve düzen
+                <button
+                  type="button"
+                  className={styles.outlineToggle}
+                  aria-expanded={outlineOpen}
+                  onClick={() => setOutlineOpen((open) => !open)}
+                >
+                  <Layers size={16} /> Sıralama ve düzen
+                  <small>{outlineOpen ? "Gizle" : "Göster"}</small>
+                </button>
               </h2>
               {selectedLane && (
                 <button
@@ -2309,7 +2369,11 @@ export function SignatureDesigner({ initial, sources, action, preview, fields, e
                 </button>
               )}
             </div>
-            {renderOutlineList(nodes, null)}
+            {outlineOpen ? (
+              renderOutlineList(nodes, null)
+            ) : (
+              <p className={styles.smallNote}>Önizlemede bir öğeye tıklayarak düzenleyin. Ayrıntılı sıralama için listeyi açın.</p>
+            )}
           </section>
         </div>
 
@@ -2345,6 +2409,37 @@ export function SignatureDesigner({ initial, sources, action, preview, fields, e
                 onUpload={(active) => setCurrentUploads((count) => count + (active ? 1 : -1))}
                 onChange={updateNode}
               />
+              {(lineCandidate || mergeCandidate) && (
+                <div className={styles.lineActions}>
+                  <span>Tek satırda birleştir</span>
+                  <div className={styles.segmented} role="group" aria-label="Birleştirme ayracı">
+                    {INLINE_SEPARATORS.map((item) => (
+                      <button key={item.value} type="button" aria-pressed={lineSep === item.value} onClick={() => setLineSep(item.value)}>
+                        {item.label}
+                      </button>
+                    ))}
+                  </div>
+                  {lineCandidate && (
+                    <button
+                      type="button"
+                      className={styles.lineActionButton}
+                      onClick={() => {
+                        const next = lineCandidate;
+                        commitNodes((current) => inLane(current, selected!.lane, (part) => part.map((n) => (n.id === next.id ? next : n))));
+                        select(next, selected!.lane);
+                      }}
+                    >
+                      Sütunları tek satıra çevir
+                    </button>
+                  )}
+                  {mergeCandidate && (
+                    <button type="button" className={styles.lineActionButton} onClick={() => commitNodes(() => mergeCandidate)}>
+                      Alttaki satırla birleştir
+                    </button>
+                  )}
+                  <p className={styles.smallNote}>Boş kalan bilgi, ayracıyla birlikte otomatik gizlenir. Telefon ve e-posta bağlantıları birleşen satırda kaldırılır.</p>
+                </div>
+              )}
               {"value" in selected.node && moveOptions.length > 1 && (
                 <label className={styles.field} htmlFor="sigwide-move-lane">
                   Bileşenin konumu

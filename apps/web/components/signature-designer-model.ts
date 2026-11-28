@@ -1,4 +1,5 @@
 import type { Align, Column, Element, FieldValues, Layout, VAlign } from "@sing365/render";
+import { compactSegments } from "@sing365/render/segments";
 
 export type ColumnsEl = Extract<Element, { type: "columns" }>;
 export type Leaf = Exclude<Element, ColumnsEl>;
@@ -421,9 +422,10 @@ export function normalizeSearch(value: string) {
   return value.toLocaleLowerCase("tr-TR").normalize("NFD").replace(/\p{Diacritic}/gu, "").replaceAll("ı", "i");
 }
 
-export function canvasText(text: string, values: FieldValues) {
+export function canvasText(raw: string, values: FieldValues) {
   let hasField = false;
   let hasValue = false;
+  const text = compactSegments(raw, values).text;
   const value = text.replace(FIELD_TOKEN, (_match, key: string, modifier?: string) => {
     hasField = true;
     const entry = values[key.toLowerCase()]?.trim() ?? "";
@@ -466,4 +468,70 @@ export function resizeColumns(node: Extract<Node, { columns: ColumnNode[] }>, ne
     kept[kept.length - 1]!.nodes.push(...overflow);
   }
   return { ...node, columns: kept };
+}
+
+// ---- Quick line editing: several fields on one line instead of one column per field ----
+
+type TextLeaf = Extract<Leaf, { type: "text" }>;
+
+const NAME_KEYS = new Set(["given_name", "surname", "display_name"]);
+
+/** Separator to put between the end of `text` and a new field: a space between name parts, else `fallback`. */
+export function separatorFor(text: string, key: string, fallback: string): string {
+  const last = [...text.matchAll(FIELD_TOKEN)].at(-1)?.[1]?.toLowerCase();
+  return last && NAME_KEYS.has(last) && NAME_KEYS.has(key.toLowerCase()) && text.trimEnd().endsWith("}}") ? " " : fallback;
+}
+
+/** Adds `{{key}}` to the end of a text line. A combined line loses its single-field link (tel:, mailto:). */
+export function appendFieldToText(block: TextLeaf, key: string, separator: string): TextLeaf {
+  const token = `{{${key}}}`;
+  if (!block.text.trim()) return { ...block, text: token };
+  const sep = separatorFor(block.text, key, separator);
+  return { ...block, text: `${block.text}${sep}${token}`, href: undefined };
+}
+
+const isTextNode = (node: Node | undefined): node is { id: string; value: TextLeaf } =>
+  Boolean(node && "value" in node && node.value.type === "text");
+
+/**
+ * A row of columns that each hold at most one text line can become one line:
+ * [Ad] [Soyad] -> "{{given_name}} {{surname}}". Null when the row holds anything else.
+ */
+export function columnsToLine(node: Node, separator: string): Node | null {
+  if (!("columns" in node)) return null;
+  const texts: TextLeaf[] = [];
+  for (const column of node.columns) {
+    if (column.nodes.length > 1) return null;
+    const only = column.nodes[0];
+    if (!only) continue;
+    if (!isTextNode(only)) return null;
+    texts.push(only.value);
+  }
+  if (texts.length === 0) return null;
+  const first = texts[0]!;
+  let text = first.text;
+  for (const next of texts.slice(1)) {
+    const key = [...next.text.matchAll(FIELD_TOKEN)][0]?.[1] ?? "";
+    text += `${separatorFor(text, key, separator)}${next.text}`;
+  }
+  return { id: node.id, value: { ...first, text, label: undefined, href: texts.length === 1 ? first.href : undefined } };
+}
+
+/** Joins a text line with the text line right below it in the same place. Null when there is none. */
+export function mergeWithNext(nodes: Node[], id: string, separator: string): Node[] | null {
+  const at = locate(nodes, id);
+  if (!at || !isTextNode(at.node)) return null;
+  const current = at.node;
+  let changed = false;
+  const result = inLane(nodes, at.lane, (part) => {
+    const index = part.findIndex((n) => n.id === id);
+    const next = part[index + 1];
+    if (index < 0 || !isTextNode(next)) return part;
+    changed = true;
+    const key = [...next.value.text.matchAll(FIELD_TOKEN)][0]?.[1] ?? "";
+    const text = `${current.value.text}${separatorFor(current.value.text, key, separator)}${next.value.text}`;
+    const merged: Node = { id, value: { ...current.value, text, label: undefined, href: undefined } };
+    return [...part.slice(0, index), merged, ...part.slice(index + 2)];
+  });
+  return changed ? result : null;
 }

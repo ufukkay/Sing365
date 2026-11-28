@@ -39,9 +39,26 @@ describe("render", () => {
     expect(r.missing).toContain("mobile_phone");
   });
 
-  it("keeps a line when only some placeholders are empty", () => {
+  it("keeps a line when only some placeholders are empty, without a dangling separator", () => {
     const r = render(layout, { ...full, department: "" });
-    expect(r.html).toContain("Account Manager | ");
+    expect(r.html).toContain("Account Manager</span>");
+    expect(r.html).not.toContain("Account Manager | ");
+    expect(r.text).toContain("Account Manager\n");
+    expect(r.missing).toContain("department");
+  });
+
+  it("drops the empty parts of a line with their separators", () => {
+    const line = (text: string, values: Record<string, string>) =>
+      render({ ...layout, elements: [{ type: "text", text }] }, values).text;
+    expect(line("T: {{business_phone}} · M: {{mobile_phone}}", { business_phone: "1", mobile_phone: "" })).toBe("T: 1");
+    expect(line("T: {{business_phone}} · M: {{mobile_phone}}", { business_phone: "", mobile_phone: "2" })).toBe("M: 2");
+    expect(line("{{street_address}}, {{city}} / {{country}}", { street_address: "Kayalar Cd.", city: "", country: "Türkiye" })).toBe("Kayalar Cd. / Türkiye");
+    expect(line("{{given_name}} {{surname}}", { given_name: "Ufuk", surname: "" })).toBe("Ufuk ");
+    expect(line("Talay · {{department}}", { department: "BT" })).toBe("Talay · BT");
+    // A line whose fields are all empty is still removed as a whole, literal parts included.
+    expect(line("Talay · {{department}}", { department: "" })).toBe("");
+    // Literal text with commas is left alone.
+    expect(line("Kayalar Caddesi, No:10/1 · {{city}}", { city: "İstanbul" })).toBe("Kayalar Caddesi, No:10/1 · İstanbul");
   });
 
   it("escapes HTML in directory values", () => {

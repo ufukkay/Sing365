@@ -12,6 +12,9 @@
  * is empty), and the result is always passed through an allow-list sanitiser.
  */
 import sanitizeHtml from "sanitize-html";
+import { compactSegments } from "./segments";
+
+export { compactSegments } from "./segments";
 
 export type FieldValues = Record<string, string | null | undefined>;
 
@@ -323,9 +326,11 @@ function renderElement(ctx: Ctx, el: Element, text: string[], defaultAlign?: Ali
   const l = ctx.layout;
   switch (el.type) {
     case "text": {
-      const html = fill(ctx, el.text, escapeHtml)?.replace(/\r\n?|\n/g, "<br>");
+      const compact = compactSegments(el.text, ctx.values);
+      for (const k of compact.dropped) value(ctx, k);
+      const html = fill(ctx, compact.text, escapeHtml)?.replace(/\r\n?|\n/g, "<br>");
       if (html === undefined) return null;
-      const plain = fill(ctx, el.text, (x) => x)!;
+      const plain = fill(ctx, compact.text, (x) => x)!;
       text.push(plain);
       const style = textStyle(ctx, el.style);
       const href = safeHref(ctx, el.href);
