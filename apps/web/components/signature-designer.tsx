@@ -59,6 +59,7 @@ import {
   extensionName,
   extensionShort,
   extractSavedCustomFields,
+  visibleExtensionSlots,
   fieldElement,
   inLane,
   insertAt,
@@ -289,7 +290,9 @@ function CustomFieldCreator({
   const [source, setSource] = useState<"static" | "entra">("static");
   const [staticValue, setStaticValue] = useState("");
   const [staticHref, setStaticHref] = useState("");
-  const [entraKey, setEntraKey] = useState(EXTENSION_SLOTS[0]!.key);
+  const [showAllSlots, setShowAllSlots] = useState(false);
+  const slots = visibleExtensionSlots(profile, showAllSlots);
+  const [entraKey, setEntraKey] = useState((slots[0] ?? EXTENSION_SLOTS[0]!).key);
 
   const canAdd = label.trim().length > 0 && (source === "entra" || staticValue.trim().length > 0);
 
@@ -367,7 +370,8 @@ function CustomFieldCreator({
           <label className={styles.field} htmlFor={`${uid}-entra`}>
             Entra ID özel kutusu
             <select id={`${uid}-entra`} value={entraKey} onChange={(e) => setEntraKey(e.target.value)}>
-              {EXTENSION_SLOTS.map((slot) => {
+              {!slots.some((slot) => slot.key === entraKey) && <option value={entraKey}>{extensionName(entraKey)}</option>}
+              {slots.map((slot) => {
                 const sample = profile[slot.key]?.trim();
                 return (
                   <option key={slot.key} value={slot.key}>
@@ -379,7 +383,14 @@ function CustomFieldCreator({
             </select>
           </label>
           <p className={styles.smallNote}>
-            Microsoft Entra ID standart alanlar dışındaki kişi bilgilerini (ör. Türkçe unvan, dahili) bu 15 özel kutuda tutar.
+            {slots.length === EXTENSION_SLOTS.length || showAllSlots
+              ? "Microsoft Entra ID standart alanlar dışındaki kişi bilgilerini (ör. Türkçe unvan, dahili) bu özel kutularda tutar."
+              : slots.length > 0
+                ? "Yalnızca önizlenen kişide dolu olan kutular listeleniyor."
+                : "Önizlenen kişide dolu bir özel kutu yok."}{" "}
+            <button type="button" className={styles.linkButton} onClick={() => setShowAllSlots((v) => !v)}>
+              {showAllSlots ? "Sadece dolu olanları göster" : "Tüm kutuları göster"}
+            </button>
           </p>
         </>
       )}
@@ -836,7 +847,7 @@ function Inspector({
               <label className={styles.field} htmlFor={`${uid}-ext`}>
                 Entra ID özel kutusu
                 <select id={`${uid}-ext`} value={field.key} onChange={(e) => changeField(e.target.value, field.prefix)}>
-                  {EXTENSION_SLOTS.map((slot) => {
+                  {visibleExtensionSlots(profile, false, field.key).map((slot) => {
                     const sample = profile[slot.key]?.trim();
                     return (
                       <option key={slot.key} value={slot.key}>

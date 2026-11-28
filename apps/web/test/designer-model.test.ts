@@ -4,6 +4,7 @@ import {
   canvasText,
   columnsToLine,
   mergeWithNext,
+  visibleExtensionSlots,
   type Node,
 } from "../components/signature-designer-model";
 
@@ -54,5 +55,12 @@ describe("quick line editing", () => {
 
   it("previews a line without empty parts", () => {
     expect(canvasText("T: {{business_phone}} · M: {{mobile_phone}}", { business_phone: "1", mobile_phone: "" }).value).toBe("T: 1");
+  });
+
+  it("lists only the extension boxes that hold data, unless all are asked for", () => {
+    const profile = { "ext.extensionattribute1": "Satış Müdürü", "ext.extensionattribute7": " " };
+    expect(visibleExtensionSlots(profile, false).map((s) => s.slot)).toEqual([1]);
+    expect(visibleExtensionSlots(profile, false, "ext.extensionattribute4").map((s) => s.slot)).toEqual([1, 4]);
+    expect(visibleExtensionSlots({}, true)).toHaveLength(15);
   });
 });

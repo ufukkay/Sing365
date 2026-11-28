@@ -535,3 +535,12 @@ export function mergeWithNext(nodes: Node[], id: string, separator: string): Nod
   });
   return changed ? result : null;
 }
+
+/**
+ * The 15 Entra extension boxes, trimmed to the ones that hold data for the previewed person
+ * (and `keep`, the one already in use). `all` lists every box.
+ */
+export function visibleExtensionSlots(profile: FieldValues, all: boolean, keep?: string) {
+  if (all) return EXTENSION_SLOTS;
+  return EXTENSION_SLOTS.filter((slot) => slot.key === keep || Boolean(profile[slot.key]?.trim()));
+}
