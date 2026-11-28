@@ -111,9 +111,9 @@ function TemplateGallery({
           >
             <div className="pointer-events-none border-b border-border bg-white p-4">
               {html[t.id] ? (
-                <PreviewFrame html={html[t.id]!} height={190} title={`${t.title} örneği`} />
+                <PreviewFrame html={html[t.id]!} height={230} title={`${t.title} örneği`} />
               ) : (
-                <p className="flex h-[190px] items-center justify-center text-sm text-gray-500">Hazırlanıyor…</p>
+                <p className="flex h-[230px] items-center justify-center text-sm text-gray-500">Hazırlanıyor…</p>
               )}
             </div>
             <div className="flex items-center justify-between gap-3 p-3">
