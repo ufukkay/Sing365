@@ -34,6 +34,8 @@ export interface QuickSignatureEditorProps {
   advancedHref: string;
   /** Searches employees for the preview; without it only `sources` can be chosen. */
   findPeople?: (query: string) => Promise<{ label: string; values: FieldValues }[]>;
+  /** Starts a new signature from this ready-made template (skips the gallery). */
+  startTemplate?: string;
   /** Public origin for social icons and the preview logo; null shows social links as text. */
   artOrigin: string | null;
 }
@@ -144,15 +146,16 @@ const FIELD_LABELS: Record<string, string> = {
   country: "Ülke",
 };
 
-export function QuickSignatureEditor({ initial, sources: given, action, preview, advancedHref, artOrigin, findPeople }: QuickSignatureEditorProps) {
+export function QuickSignatureEditor({ initial, sources: given, action, preview, advancedHref, artOrigin, findPeople, startTemplate }: QuickSignatureEditorProps) {
+  const start = initial ? undefined : QUICK_TEMPLATES.find((t) => t.id === startTemplate);
   const [found, setFound] = useState<{ label: string; values: FieldValues }[]>([]);
   const [query, setQuery] = useState("");
   const [searching, setSearching] = useState(false);
   const [searched, setSearched] = useState("");
   const sources = useMemo(() => [...given, ...found], [given, found]);
   const uid = useId();
-  const [name, setName] = useState(initial?.name ?? "");
-  const [config, setConfig] = useState<QuickConfig>(initial?.config ?? DEFAULT_QUICK_CONFIG);
+  const [name, setName] = useState(initial?.name ?? (start ? `${start.title} imza` : ""));
+  const [config, setConfig] = useState<QuickConfig>(initial?.config ?? (start ? applyQuickTemplate(DEFAULT_QUICK_CONFIG, start) : DEFAULT_QUICK_CONFIG));
   const [source, setSource] = useState(0);
   const [result, setResult] = useState<Preview | null>(null);
   const [uploading, setUploading] = useState(false);
@@ -160,7 +163,7 @@ export function QuickSignatureEditor({ initial, sources: given, action, preview,
   const [formState, submit, saving] = useActionState(action, { errors: [] });
   const fileRef = useRef<HTMLInputElement>(null);
 
-  const [choosing, setChoosing] = useState(!initial);
+  const [choosing, setChoosing] = useState(!initial && !start);
   const [asReply, setAsReply] = useState(false);
   const layout = useMemo(() => buildQuickLayout(config, artOrigin), [config, artOrigin]);
   const sample = useMemo(() => withSamples(config, artOrigin), [config, artOrigin]);

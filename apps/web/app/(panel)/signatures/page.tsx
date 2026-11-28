@@ -7,6 +7,8 @@ import { requirePanel } from "@/lib/context";
 import { data } from "@/lib/data";
 import type { Template } from "@/lib/data/types";
 import { fieldValues } from "@/lib/signature";
+import { publicAssetOrigin } from "@/lib/public-origin";
+import { applyQuickTemplate, buildQuickLayout, DEFAULT_QUICK_CONFIG, QUICK_TEMPLATES, withSamples } from "@/lib/quick-signature";
 import { parseVisualLayout, visualSampleSources } from "@/lib/visual-signature";
 import { changeTemplateArchiveAction, deleteArchivedSignatureAction } from "./actions";
 
@@ -148,6 +150,16 @@ export default async function SignaturesPage({ searchParams }: { searchParams: P
   }
 
   const grid = "grid items-stretch gap-4 md:grid-cols-2 xl:grid-cols-3";
+  const origin = publicAssetOrigin();
+  const ready = QUICK_TEMPLATES.map((t) => {
+    let html = "";
+    try {
+      html = render(buildQuickLayout(withSamples(applyQuickTemplate(DEFAULT_QUICK_CONFIG, t), origin).config, origin), values).html;
+    } catch {
+      html = "";
+    }
+    return { ...t, html };
+  });
   return (
     <>
       <PageHeader title="İmzalar" actions={
@@ -159,8 +171,7 @@ export default async function SignaturesPage({ searchParams }: { searchParams: P
 
       {active.length + drafts.length === 0 ? (
         <Card>
-          <EmptyState title="Henüz imza yok" body="Hazır örneklerden birini seçip birkaç dakikada ilk imzanızı oluşturun."
-            action={<Link href="/signatures/new" className="text-sm font-semibold text-accent underline">İmza oluştur</Link>} />
+          <EmptyState title="Henüz imza yok" body="Aşağıdaki şablonlardan birini seçin ya da “Yeni imza” ile kendiniz tasarlayın." action={null} />
         </Card>
       ) : (
         <>
@@ -181,6 +192,31 @@ export default async function SignaturesPage({ searchParams }: { searchParams: P
           )}
         </>
       )}
+
+      <section id="sablonlar" aria-labelledby="sig-templates" className="mb-8 scroll-mt-20">
+        <h2 id="sig-templates" className="mb-1 text-sm font-semibold text-text">Şablonlar</h2>
+        <p className="mb-3 text-xs text-text-muted">Hazır bir tasarımla başlayın; logonuzu, renginizi ve bilgileri sonra değiştirebilirsiniz.</p>
+        <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
+          {ready.map((t) => (
+            <Link key={t.id} href={{ pathname: "/signatures/new", query: { template: t.id } }} className="group flex flex-col overflow-hidden rounded-lg border border-border bg-surface-raised shadow-card hover:border-accent">
+              <span className="relative block h-32 overflow-hidden border-b border-border bg-white">
+                {t.html && (
+                  <iframe title={`${t.title} şablonu`} sandbox="" tabIndex={-1}
+                    className="pointer-events-none absolute left-0 top-0 h-[214px] w-[166.67%] origin-top-left scale-[0.6]"
+                    srcDoc={`<!doctype html><html><body style="margin:16px;background:#fff">${t.html}</body></html>`} />
+                )}
+              </span>
+              <span className="flex items-center justify-between gap-2 px-3 py-2.5">
+                <span className="min-w-0">
+                  <span className="block text-sm font-semibold text-text">{t.title}</span>
+                  <span className="block truncate text-xs text-text-muted">{t.subtitle}</span>
+                </span>
+                <span className="shrink-0 text-xs font-semibold text-accent group-hover:underline">Kullan</span>
+              </span>
+            </Link>
+          ))}
+        </div>
+      </section>
 
       {archived.length > 0 && (
         <details className="group" open={params.notice === "deleted" || params.notice === "delete-blocked" || params.notice === "archived"}>

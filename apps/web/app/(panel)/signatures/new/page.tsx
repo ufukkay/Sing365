@@ -1,6 +1,7 @@
 import Link from "next/link";
 import { QuickSignatureEditor } from "@/components/quick-signature-editor";
 import { publicAssetOrigin } from "@/lib/public-origin";
+import { QUICK_TEMPLATES } from "@/lib/quick-signature";
 import { SignatureDesigner } from "@/components/signature-designer";
 import { PageHeader } from "@/components/ui";
 import { requirePanel } from "@/lib/context";
@@ -11,8 +12,11 @@ import { previewPeopleAction, previewVisualTemplateAction, saveVisualTemplateAct
 
 export const metadata = { title: "Yeni imza" };
 
-export default async function NewSignature({ searchParams }: { searchParams: Promise<{ mode?: string }> }) {
-  const advanced = (await searchParams).mode === "advanced";
+export default async function NewSignature({ searchParams }: { searchParams: Promise<{ template?: string }> }) {
+  // A ready-made template (chosen on the signatures page) opens the quick editor; otherwise the full designer.
+  const wanted = (await searchParams).template;
+  const template = QUICK_TEMPLATES.find((t) => t.id === wanted);
+  const advanced = !template;
   const { tenantId, session } = await requirePanel();
   const [me, templates] = await Promise.all([
     session ? data.findUserByEmail(tenantId, session.email) : Promise.resolve(null),
@@ -27,7 +31,7 @@ export default async function NewSignature({ searchParams }: { searchParams: Pro
         title="Yeni imza"
         actions={
           <div className="flex items-center gap-4">
-            {advanced && <Link href="/signatures/new" className="text-sm font-medium text-accent underline-offset-4 hover:underline">Hızlı düzenleyici</Link>}
+            {advanced && <Link href="/signatures#sablonlar" className="text-sm font-medium text-accent underline-offset-4 hover:underline">Hazır şablonla başla</Link>}
             <Link href="/signatures" className="text-sm font-medium text-accent underline-offset-4 hover:underline">Tüm imzalar</Link>
           </div>
         }
@@ -40,7 +44,7 @@ export default async function NewSignature({ searchParams }: { searchParams: Pro
       ) : (
         <QuickSignatureEditor
           action={saveVisualTemplateAction} preview={previewVisualTemplateAction}
-          sources={sources} artOrigin={publicAssetOrigin()} findPeople={previewPeopleAction} advancedHref="/signatures/new?mode=advanced"
+          sources={sources} artOrigin={publicAssetOrigin()} findPeople={previewPeopleAction} advancedHref="/signatures/new" startTemplate={template?.id}
         />
       )}
     </>

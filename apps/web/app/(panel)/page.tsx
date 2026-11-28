@@ -32,7 +32,7 @@ export default async function Dashboard() {
 
   const steps = [
     { done: sync.state === "succeeded" && counts.enabled > 0, title: "Microsoft 365 dizini bağlandı", body: `${counts.enabled.toLocaleString("tr-TR")} çalışan eşitlendi.`, href: "/users", cta: "Kişileri gör" },
-    { done: signatures.length > 0, title: "İlk imzanızı oluşturun", body: "Hazır örneklerden birini seçip logonuzu ve renginizi ekleyin.", href: "/signatures/new", cta: "İmza oluştur" },
+    { done: signatures.length > 0, title: "İlk imzanızı oluşturun", body: "Hazır bir şablon seçip logonuzu ve renginizi ekleyin.", href: "/signatures#sablonlar", cta: "Şablon seç" },
     { done: published.length > 0, title: "İmzayı kullanıma alın", body: "Hangi çalışanların postalarına ekleneceğini seçin.", href: "/signatures", cta: "İmzalara git" },
     { done: Boolean(tenant?.relayKeySet), title: "Exchange bağlantısını kurun", body: "Telefon dahil tüm cihazlardan giden postalara imza eklenir.", href: "/exchange", cta: "Kurulumu aç" },
   ];
