@@ -1,20 +1,16 @@
 import Link from "next/link";
-import { Archive, ArrowRight, FileText, PenLine, Plus, RotateCcw, Trash2 } from "lucide-react";
+import { Archive, ArrowRight, PenLine, Plus, RotateCcw, Trash2 } from "lucide-react";
+import { render } from "@sing365/render";
+import type { Rule } from "@sing365/rules";
 import { Badge, Button, Card, EmptyState, PageHeader } from "@/components/ui";
 import { requirePanel } from "@/lib/context";
 import { data } from "@/lib/data";
 import type { Template } from "@/lib/data/types";
-import { parseVisualLayout } from "@/lib/visual-signature";
+import { fieldValues } from "@/lib/signature";
+import { parseVisualLayout, visualSampleSources } from "@/lib/visual-signature";
 import { changeTemplateArchiveAction, deleteArchivedSignatureAction } from "./actions";
 
 export const metadata = { title: "İmzalar" };
-
-const filters = [
-  { value: "all", label: "Tümü" },
-  { value: "draft", label: "Taslak" },
-  { value: "published", label: "Aktif" },
-  { value: "archived", label: "Arşiv" },
-] as const;
 
 const notices: Record<string, { text: string; error?: true }> = {
   archived: { text: "Şablon arşive taşındı." },
@@ -26,6 +22,26 @@ const notices: Record<string, { text: string; error?: true }> = {
 
 const date = new Intl.DateTimeFormat("tr-TR", { dateStyle: "medium", timeZone: "Europe/Istanbul" });
 const cardLink = "inline-flex min-h-8 items-center gap-1.5 rounded-md px-2.5 text-xs font-semibold hover:bg-surface";
+
+/** One line on who gets the signature, from its rules. */
+function audience(rules: Rule[], groups: Map<string, string>): string {
+  const rule = rules.find((r) => r.enabled) ?? rules[0];
+  if (!rule) return "Henüz kimseye uygulanmıyor";
+  const s = rule.senders;
+  const parts: string[] = [];
+  if (s.all) parts.push("Tüm çalışanlar");
+  const names = (s.groups ?? []).map((id) => groups.get(id) ?? "1 grup");
+  if (names.length) parts.push(names.length > 2 ? `${names.slice(0, 2).join(", ")} +${names.length - 2} grup` : names.join(", "));
+  if (s.departments?.length) parts.push(s.departments.length > 2 ? `${s.departments.length} departman` : s.departments.join(", "));
+  if (s.users?.length) parts.push(`${s.users.length} kişi`);
+  if (s.attr?.length) parts.push("özel koşul");
+  let text = parts.join(" · ") || "Seçili kişiler";
+  if (rule.recipients.scope === "external") text += ", dış alıcılara";
+  if (rule.recipients.scope === "internal") text += ", iç alıcılara";
+  if (rule.appliesTo === "new") text += ", yeni postalarda";
+  if (rule.appliesTo === "reply") text += ", yanıtlarda";
+  return text;
+}
 
 function ArchiveButton({ template }: { template: Template }) {
   const restore = template.status === "archived";
@@ -56,16 +72,82 @@ function DeleteButton({ template }: { template: Template }) {
   );
 }
 
-export default async function SignaturesPage({ searchParams }: { searchParams: Promise<{ status?: string; notice?: string }> }) {
-  const { tenantId } = await requirePanel();
-  const [templates, rules, params] = await Promise.all([data.listTemplates(tenantId), data.listRules(tenantId), searchParams]);
+export default async function SignaturesPage({ searchParams }: { searchParams: Promise<{ notice?: string }> }) {
+  const { tenantId, session } = await requirePanel();
+  const [templates, rules, groups, me, params] = await Promise.all([
+    data.listTemplates(tenantId),
+    data.listRules(tenantId),
+    data.listGroups(tenantId),
+    session ? data.findUserByEmail(tenantId, session.email) : Promise.resolve(null),
+    searchParams,
+  ]);
+  const groupNames = new Map(groups.map((g) => [g.id, g.displayName]));
+  const values = me ? fieldValues(me) : visualSampleSources[0]!.values;
   const signatures = templates.filter((template) => template.kind === "signature");
-  const current = filters.find((filter) => filter.value === params.status) ?? filters[0];
   const notice = params.notice ? notices[params.notice] : undefined;
-  const priority = (id: string) => Math.min(...rules.filter((rule) => rule.templateId === id).map((rule) => rule.priority));
-  const visible = signatures.filter((template) => current.value === "all" || template.status === current.value)
-    .sort((a, b) => priority(a.id) - priority(b.id) || a.name.localeCompare(b.name, "tr"));
+  const rulesOf = (id: string) => rules.filter((rule) => rule.templateId === id);
+  const priority = (id: string) => Math.min(...rulesOf(id).map((rule) => rule.priority));
+  const byName = (a: Template, b: Template) => a.name.localeCompare(b.name, "tr");
+  const active = signatures.filter((t) => t.status === "published").sort((a, b) => priority(a.id) - priority(b.id) || byName(a, b));
+  const drafts = signatures.filter((t) => t.status === "draft").sort((a, b) => +new Date(b.updatedAt) - +new Date(a.updatedAt));
+  const archived = signatures.filter((t) => t.status === "archived").sort(byName);
 
+  function preview(template: Template) {
+    try {
+      return render(template.layout, values).html;
+    } catch {
+      return "";
+    }
+  }
+
+  function SignatureCard({ template }: { template: Template }) {
+    const isArchived = template.status === "archived";
+    const isActive = template.status === "published";
+    const editable = !isArchived && Boolean(parseVisualLayout(template.layout).layout);
+    const html = isArchived ? "" : preview(template);
+    return (
+      <article className="flex flex-col overflow-hidden rounded-lg border border-border bg-surface-raised shadow-card">
+        {!isArchived && (
+          <Link href={editable ? `/signatures/${template.id}/edit` : `/signatures/${template.id}`} aria-label={`${template.name} imzasını aç`} className="relative block h-40 overflow-hidden border-b border-border bg-white">
+            {html ? (
+              <iframe
+                title={`${template.name} önizlemesi`}
+                sandbox=""
+                tabIndex={-1}
+                className="pointer-events-none absolute left-0 top-0 h-[214px] w-[133.34%] origin-top-left scale-[0.75]"
+                srcDoc={`<!doctype html><html><body style="margin:16px;background:#fff">${html}</body></html>`}
+              />
+            ) : (
+              <span className="grid h-full place-items-center text-xs text-gray-500">Önizleme yok</span>
+            )}
+          </Link>
+        )}
+        <div className="flex flex-1 flex-col gap-1 px-4 pt-3">
+          <div className="flex items-start justify-between gap-2">
+            <Link href={`/signatures/${template.id}`} className="min-w-0 break-words font-semibold leading-5 text-text underline-offset-4 hover:text-accent hover:underline">{template.name}</Link>
+            {isActive && <Badge tone="success">Kullanımda</Badge>}
+          </div>
+          <p className="text-xs text-text-muted">
+            {isActive ? audience(rulesOf(template.id), groupNames) : `Son değişiklik ${date.format(new Date(template.updatedAt))}`}
+          </p>
+        </div>
+        <div className="mt-3 flex flex-wrap items-center gap-1 border-t border-border px-3 py-2">
+          {editable && <Link href={`/signatures/${template.id}/edit`} className={`${cardLink} text-text`}><PenLine aria-hidden size={14} /> Düzenle</Link>}
+          {!isArchived && (
+            <Link href={{ pathname: "/signatures/apply", query: { template: template.id } }} className={`${cardLink} text-accent`}>
+              {isActive ? "Kimlere uygulanır" : "Kullanıma al"} <ArrowRight aria-hidden size={14} />
+            </Link>
+          )}
+          <span className="ml-auto flex items-center gap-1">
+            <ArchiveButton template={template} />
+            {isArchived && <DeleteButton template={template} />}
+          </span>
+        </div>
+      </article>
+    );
+  }
+
+  const grid = "grid items-stretch gap-4 md:grid-cols-2 xl:grid-cols-3";
   return (
     <>
       <PageHeader title="İmzalar" actions={
@@ -73,54 +155,49 @@ export default async function SignaturesPage({ searchParams }: { searchParams: P
           <Plus aria-hidden size={17} /> Yeni imza
         </Link>
       } />
-      <nav aria-label="Şablon durumu" className="mb-5 flex flex-wrap items-center gap-1.5 border-b border-border pb-3">
-        {filters.map((filter) => {
-          const active = filter.value === current.value;
-          const count = filter.value === "all" ? signatures.length : signatures.filter((template) => template.status === filter.value).length;
-          return (
-            <Link key={filter.value} href={filter.value === "all" ? "/signatures" : { pathname: "/signatures", query: { status: filter.value } }}
-              aria-current={active ? "page" : undefined}
-              className={`inline-flex min-h-9 items-center gap-2 rounded-md px-3 text-sm font-semibold ${active ? "bg-accent-subtle text-accent" : "text-text-muted hover:bg-surface-raised hover:text-text"}`}>
-              {filter.label}<span className="text-xs tabular-nums">{count}</span>
-            </Link>
-          );
-        })}
-      </nav>
       {notice && <div role={notice.error ? "alert" : "status"} className={`mb-4 rounded-md px-4 py-3 text-sm ${notice.error ? "bg-danger-subtle text-danger" : "bg-success-subtle text-success"}`}>{notice.text}</div>}
 
-      {visible.length === 0 ? (
+      {active.length + drafts.length === 0 ? (
         <Card>
-          <EmptyState title={current.value === "all" ? "Henüz imza yok" : `${current.label} şablon bulunamadı`}
-            body={current.value === "all" ? "İlk imzanızı bileşen ve Entra ID alanlarıyla tasarlayın." : undefined}
-            action={current.value === "all" || current.value === "draft" ? <Link href="/signatures/new" className="text-sm font-semibold text-accent underline">İmza oluştur</Link> : undefined} />
+          <EmptyState title="Henüz imza yok" body="Hazır örneklerden birini seçip birkaç dakikada ilk imzanızı oluşturun."
+            action={<Link href="/signatures/new" className="text-sm font-semibold text-accent underline">İmza oluştur</Link>} />
         </Card>
       ) : (
-        <div className="grid items-start gap-4 md:grid-cols-2 xl:grid-cols-3 2xl:grid-cols-4">
-          {visible.map((template) => {
-            const archived = template.status === "archived";
-            const active = template.status === "published";
-            const editable = !archived && Boolean(parseVisualLayout(template.layout).layout);
-            const order = priority(template.id);
-            return (
-              <article key={template.id} className="rounded-lg border border-border bg-surface-raised shadow-card">
-                <div className="flex items-start gap-3 px-4 pt-4 sm:px-5 sm:pt-5">
-                  <div className="grid size-10 shrink-0 place-items-center rounded-md bg-accent-subtle text-accent"><FileText aria-hidden size={19} /></div>
-                  <div className="min-w-0 flex-1">
-                    <Link href={`/signatures/${template.id}`} className="block break-words font-semibold leading-5 text-text underline-offset-4 hover:text-accent hover:underline">{template.name}</Link>
-                    <p className="mt-1 text-xs text-text-muted">{date.format(new Date(template.updatedAt))}{active && Number.isFinite(order) ? ` · Sıra ${order}` : ""}</p>
-                  </div>
-                  <Badge tone={active ? "success" : "neutral"}>{active ? "Aktif" : archived ? "Arşiv" : "Taslak"}</Badge>
-                </div>
-                <div className="mt-4 flex flex-wrap items-start gap-1 border-t border-border px-3 py-2 sm:px-4">
-                  {editable && <Link href={`/signatures/${template.id}/edit`} className={`${cardLink} text-text`}><PenLine aria-hidden size={14} /> Düzenle</Link>}
-                  {!archived && <Link href={{ pathname: "/signatures/apply", query: { template: template.id } }} className={`${cardLink} text-accent`}>Uygula <ArrowRight aria-hidden size={14} /></Link>}
-                  <ArchiveButton template={template} />
-                  {archived && <DeleteButton template={template} />}
-                </div>
-              </article>
-            );
-          })}
-        </div>
+        <>
+          <section aria-labelledby="sig-active" className="mb-8">
+            <h2 id="sig-active" className="mb-1 text-sm font-semibold text-text">Kullanımda <span className="font-normal text-text-muted">({active.length})</span></h2>
+            <p className="mb-3 text-xs text-text-muted">Bu imzalar gönderilen postalara ekleniyor. Önizlemeler {me ? "sizin bilgilerinizle" : "örnek bir kişiyle"} gösteriliyor.</p>
+            {active.length ? (
+              <div className={grid}>{active.map((t) => <SignatureCard key={t.id} template={t} />)}</div>
+            ) : (
+              <p className="rounded-md border border-dashed border-border px-4 py-6 text-center text-sm text-text-muted">Henüz kullanımda imza yok. Aşağıdaki taslaklardan birini “Kullanıma al” ile etkinleştirin.</p>
+            )}
+          </section>
+          {drafts.length > 0 && (
+            <section aria-labelledby="sig-drafts" className="mb-8">
+              <h2 id="sig-drafts" className="mb-3 text-sm font-semibold text-text">Taslaklar <span className="font-normal text-text-muted">({drafts.length})</span></h2>
+              <div className={grid}>{drafts.map((t) => <SignatureCard key={t.id} template={t} />)}</div>
+            </section>
+          )}
+        </>
+      )}
+
+      {archived.length > 0 && (
+        <details className="group" open={params.notice === "deleted" || params.notice === "delete-blocked" || params.notice === "archived"}>
+          <summary className="cursor-pointer list-none text-sm font-semibold text-text-muted hover:text-text [&::-webkit-details-marker]:hidden">
+            <span className="group-open:hidden">▸</span><span className="hidden group-open:inline">▾</span> Arşiv ({archived.length})
+          </summary>
+          <div className="mt-3 grid gap-2">
+            {archived.map((t) => (
+              <div key={t.id} className="flex flex-wrap items-center gap-2 rounded-md border border-border bg-surface-raised px-3 py-2">
+                <Link href={`/signatures/${t.id}`} className="min-w-0 flex-1 truncate text-sm font-medium text-text hover:underline">{t.name}</Link>
+                <span className="text-xs text-text-muted">{date.format(new Date(t.updatedAt))}</span>
+                <ArchiveButton template={t} />
+                <DeleteButton template={t} />
+              </div>
+            ))}
+          </div>
+        </details>
       )}
     </>
   );

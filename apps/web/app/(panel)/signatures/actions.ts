@@ -205,7 +205,7 @@ export async function changeTemplateArchiveAction(form: FormData) {
   }
   if (!(await data.setVisualTemplateStatus(tenantId, id, version, status, template.status))) redirect("/signatures?notice=conflict");
   refreshSignatures(id);
-  redirect(status === "archived" ? "/signatures?status=archived&notice=archived" : "/signatures?status=draft&notice=restored");
+  redirect(status === "archived" ? "/signatures?notice=archived" : "/signatures?notice=restored");
 }
 
 export async function deleteArchivedSignatureAction(form: FormData) {
@@ -214,11 +214,11 @@ export async function deleteArchivedSignatureAction(form: FormData) {
   const version = submittedVersion(form);
   const template = await data.getTemplate(tenantId, id);
   if (version === null || template?.status !== "archived" || template.kind !== "signature" || form.get("confirm") !== "yes") {
-    redirect("/signatures?status=archived&notice=delete-blocked");
+    redirect("/signatures?notice=delete-blocked");
   }
-  if (!(await data.deleteArchivedTemplate(tenantId, id, version))) redirect("/signatures?status=archived&notice=delete-blocked");
+  if (!(await data.deleteArchivedTemplate(tenantId, id, version))) redirect("/signatures?notice=delete-blocked");
   refreshSignatures(id);
-  redirect("/signatures?status=archived&notice=deleted");
+  redirect("/signatures?notice=deleted");
 }
 
 export async function duplicateVisualTemplateAction(form: FormData) {
