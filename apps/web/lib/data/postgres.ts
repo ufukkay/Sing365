@@ -24,6 +24,9 @@ interface UserRow {
   state: string | null;
   postal_code: string | null;
   country: string | null;
+  fax_number: string | null;
+  usage_location: string | null;
+  preferred_language: string | null;
   photo_url: string | null;
   group_ids: string[] | null;
   custom_attrs: Record<string, string>;
@@ -51,6 +54,9 @@ const toUser = (r: UserRow): DirectoryUser => ({
   state: r.state ?? undefined,
   postalCode: r.postal_code ?? undefined,
   country: r.country ?? undefined,
+  faxNumber: r.fax_number ?? undefined,
+  usageLocation: r.usage_location ?? undefined,
+  preferredLanguage: r.preferred_language ?? undefined,
   photoUrl: r.photo_url ?? undefined,
   groupIds: r.group_ids ?? [],
   customAttrs: r.custom_attrs ?? {},
@@ -63,6 +69,7 @@ const toUser = (r: UserRow): DirectoryUser => ({
 const USER_SELECT = `
   u.id, u.email, u.aliases, u.display_name, u.given_name, u.surname, u.job_title, u.department, u.company_name,
   u.office_location, u.business_phone, u.mobile_phone, u.street_address, u.city, u.state, u.postal_code, u.country,
+  u.fax_number, u.usage_location, u.preferred_language,
   null::text as photo_url, u.custom_attrs, u.extension_attrs, u.overrides, u.account_enabled, u.last_synced_at,
   (select array_agg(gm.group_id) from group_members gm where gm.user_id = u.id) as group_ids`;
 

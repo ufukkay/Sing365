@@ -19,6 +19,9 @@ export interface DirectoryUserInput {
   state?: string | null;
   postalCode?: string | null;
   country: string | null;
+  faxNumber?: string | null;
+  usageLocation?: string | null;
+  preferredLanguage?: string | null;
   managerEntraId: string | null;
   extensionAttrs: Record<string, string>;
   accountEnabled: boolean;
@@ -98,7 +101,7 @@ export async function upsertUsers(
       insert into directory_users (
         tenant_id, entra_object_id, email, aliases, display_name, given_name, surname, job_title, department,
         company_name, office_location, business_phone, mobile_phone, street_address, city, state, postal_code, country,
-        manager_entra_id, extension_attrs, account_enabled, mailbox_type, last_synced_at, deleted_at)
+        fax_number, usage_location, preferred_language, manager_entra_id, extension_attrs, account_enabled, mailbox_type, last_synced_at, deleted_at)
       values (
         ${tenantId}, ${u.entraObjectId}, ${u.email.toLowerCase()},
         ${selected("proxyAddresses") ? u.aliases.map((a) => a.toLowerCase()) : []}::citext[],
@@ -116,6 +119,9 @@ export async function upsertUsers(
         ${selected("state") ? u.state ?? null : null},
         ${selected("postalCode") ? u.postalCode ?? null : null},
         ${selected("country") ? u.country : null},
+        ${selected("faxNumber") ? u.faxNumber ?? null : null},
+        ${selected("usageLocation") ? u.usageLocation ?? null : null},
+        ${selected("preferredLanguage") ? u.preferredLanguage ?? null : null},
         ${projection ? null : u.managerEntraId}, ${tx.json(extensions)},
         ${selected("accountEnabled") ? u.accountEnabled : true}, ${projection ? "user" : u.mailboxType}, now(), null)
       on conflict (tenant_id, entra_object_id) do update set
@@ -135,6 +141,9 @@ export async function upsertUsers(
         state = case when ${selected("state")} then excluded.state else directory_users.state end,
         postal_code = case when ${selected("postalCode")} then excluded.postal_code else directory_users.postal_code end,
         country = case when ${selected("country")} then excluded.country else directory_users.country end,
+        fax_number = case when ${selected("faxNumber")} then excluded.fax_number else directory_users.fax_number end,
+        usage_location = case when ${selected("usageLocation")} then excluded.usage_location else directory_users.usage_location end,
+        preferred_language = case when ${selected("preferredLanguage")} then excluded.preferred_language else directory_users.preferred_language end,
         manager_entra_id = case when ${!projection} then excluded.manager_entra_id else directory_users.manager_entra_id end,
         extension_attrs = case
           when ${!projection} then excluded.extension_attrs

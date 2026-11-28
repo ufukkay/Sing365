@@ -49,9 +49,12 @@ export const FIELD_HELP: { key: string; label: string }[] = [
   { key: "email", label: "E-posta" },
   { key: "business_phone", label: "İş telefonu" },
   { key: "mobile_phone", label: "Cep telefonu" },
+  { key: "fax_number", label: "Faks" },
   { key: "street_address", label: "Açık adres" },
   { key: "city", label: "Şehir / ilçe" },
   { key: "state", label: "İl / eyalet" },
   { key: "postal_code", label: "Posta kodu" },
   { key: "country", label: "Ülke" },
+  { key: "usage_location", label: "Ülke kodu" },
+  { key: "preferred_language", label: "Tercih edilen dil" },
 ];

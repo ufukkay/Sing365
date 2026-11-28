@@ -20,6 +20,9 @@ export function fieldValues(u: DirectoryUser): FieldValues {
     state: u.state,
     postal_code: u.postalCode,
     country: u.country,
+    fax_number: u.faxNumber,
+    usage_location: u.usageLocation,
+    preferred_language: u.preferredLanguage,
     photo_url: u.photoUrl,
   };
   for (const [k, v] of Object.entries(u.extAttrs ?? {})) base[`ext.${k.toLowerCase()}`] = v;

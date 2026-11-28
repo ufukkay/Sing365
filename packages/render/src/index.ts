@@ -95,6 +95,9 @@ export const KNOWN_FIELDS = [
   "state",
   "postal_code",
   "country",
+  "fax_number",
+  "usage_location",
+  "preferred_language",
   "photo_url",
 ] as const;
 

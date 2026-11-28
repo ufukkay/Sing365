@@ -38,6 +38,11 @@ export interface DirectoryUser {
   state?: string;
   postalCode?: string;
   country?: string;
+  faxNumber?: string;
+  /** Two-letter country of use, e.g. TR. */
+  usageLocation?: string;
+  /** e.g. tr-TR */
+  preferredLanguage?: string;
   photoUrl?: string;
   groupIds: string[];
   customAttrs: Record<string, string>;

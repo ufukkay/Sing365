@@ -29,6 +29,9 @@ const OPTIONAL_USER_PROPERTIES = {
   state: "state",
   postal_code: "postalCode",
   country: "country",
+  fax_number: "faxNumber",
+  usage_location: "usageLocation",
+  preferred_language: "preferredLanguage",
 };
 const GROUP_SELECTION = "id,displayName,members";
 
@@ -70,6 +73,9 @@ export interface GraphUser {
   state?: string | null;
   postalCode?: string | null;
   country?: string | null;
+  faxNumber?: string | null;
+  usageLocation?: string | null;
+  preferredLanguage?: string | null;
   accountEnabled?: boolean | null;
   userType?: string | null;
   onPremisesExtensionAttributes?: Record<string, string | null> | null;
@@ -119,6 +125,9 @@ export function mapUser(u: GraphUser, extensionKeys?: readonly string[]): Direct
     state: clean(u.state),
     postalCode: clean(u.postalCode),
     country: clean(u.country),
+    faxNumber: clean(u.faxNumber),
+    usageLocation: clean(u.usageLocation),
+    preferredLanguage: clean(u.preferredLanguage),
     managerEntraId: null,
     extensionAttrs: ext,
     accountEnabled: u.accountEnabled !== false,

@@ -30,6 +30,7 @@ export const QUICK_FIELDS = [
   { key: "company_name", label: "Şirket adı" },
   { key: "business_phone", label: "İş telefonu" },
   { key: "mobile_phone", label: "Cep telefonu" },
+  { key: "fax_number", label: "Faks" },
   { key: "email", label: "E-posta" },
   { key: "address", label: "Adres" },
 ] as const;
@@ -81,6 +82,7 @@ export const DEFAULT_QUICK_CONFIG: QuickConfig = {
     company_name: true,
     business_phone: true,
     mobile_phone: true,
+    fax_number: false,
     email: true,
     address: false,
   },
@@ -122,7 +124,7 @@ export const QUICK_TEMPLATES: {
       style: "side",
       color: "#166b63",
       font: QUICK_FONTS[0].value,
-      show: { job_title: true, department: false, company_name: true, business_phone: true, mobile_phone: true, email: true, address: false },
+      show: { job_title: true, department: false, company_name: true, business_phone: true, mobile_phone: true, fax_number: false, email: true, address: false },
       social: ["linkedin"],
     },
   },
@@ -134,7 +136,7 @@ export const QUICK_TEMPLATES: {
       style: "logo-top",
       color: "#1d4ed8",
       font: QUICK_FONTS[1].value,
-      show: { job_title: true, department: false, company_name: true, business_phone: false, mobile_phone: true, email: true, address: false },
+      show: { job_title: true, department: false, company_name: true, business_phone: false, mobile_phone: true, fax_number: false, email: true, address: false },
       social: ["linkedin", "instagram", "x"],
     },
   },
@@ -146,7 +148,7 @@ export const QUICK_TEMPLATES: {
       style: "classic",
       color: "#0f172a",
       font: QUICK_FONTS[5].value,
-      show: { job_title: true, department: true, company_name: true, business_phone: true, mobile_phone: false, email: true, address: true },
+      show: { job_title: true, department: true, company_name: true, business_phone: true, mobile_phone: false, fax_number: false, email: true, address: true },
       social: [],
     },
   },
@@ -158,7 +160,7 @@ export const QUICK_TEMPLATES: {
       style: "minimal",
       color: "#475569",
       font: QUICK_FONTS[2].value,
-      show: { job_title: true, department: false, company_name: false, business_phone: false, mobile_phone: true, email: true, address: false },
+      show: { job_title: true, department: false, company_name: false, business_phone: false, mobile_phone: true, fax_number: false, email: true, address: false },
       social: [],
     },
   },
@@ -224,8 +226,8 @@ export function buildQuickLayout(config: QuickConfig, artOrigin: string | null =
   if (show.company_name) identity.push({ type: "text", text: "{{company_name}}", style: { size: 13, bold: true, color: TEXT } });
 
   const contact: Element[] = [];
-  const phones = [show.business_phone && "T: {{business_phone}}", show.mobile_phone && "M: {{mobile_phone}}"].filter(Boolean);
-  if (phones.length === 1) {
+  const phones = [show.business_phone && "T: {{business_phone}}", show.mobile_phone && "M: {{mobile_phone}}", show.fax_number && "F: {{fax_number}}"].filter(Boolean);
+  if (phones.length === 1 && !show.fax_number) {
     const key = show.business_phone ? "business_phone" : "mobile_phone";
     contact.push({ type: "text", text: phones[0] as string, href: `tel:{{${key}}}`, style: { size: 12, color: TEXT } });
   } else if (phones.length) {

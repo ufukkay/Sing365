@@ -157,3 +157,11 @@ describe("replies and outside-only footer", () => {
     expect(parsed.layout!.reply).toBeUndefined();
   });
 });
+
+describe("fax", () => {
+  it("adds the fax to the phone line when chosen and drops it when empty", () => {
+    const show = { ...DEFAULT_QUICK_CONFIG.show, fax_number: true };
+    expect(render(buildQuickLayout(config({ show })), { ...person, fax_number: "+90 212 000 00 99" }).text).toContain("T: +90 212 000 00 01 · F: +90 212 000 00 99");
+    expect(render(buildQuickLayout(config({ show })), person).text).not.toContain("F:");
+  });
+});
