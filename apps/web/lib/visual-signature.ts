@@ -1,5 +1,6 @@
 import { isSignatureImageUrl, validateLayout, type Align, type Element, type FieldValues, type Layout, type TextStyle, type VAlign } from "@sing365/render";
 import type { Rule } from "@sing365/rules";
+import { buildQuickLayout, parseQuickConfig } from "./quick-signature";
 
 export const visualFields: { key: string; label: string; group: string }[] = [
   { key: "display_name", label: "Görünen ad", group: "Kimlik" },
@@ -267,7 +268,16 @@ function readElements(value: unknown, maxWidth: number, allowColumns: boolean, c
 /** Parses the visual editor payload before it can be stored or rendered. */
 export function parseVisualLayout(input: unknown): VisualLayoutResult {
   try {
-    const source = record(input, "İmza düzeni okunamadı.");
+    let source = record(input, "İmza düzeni okunamadı.");
+    // A quick-editor signature: the blocks are always rebuilt here from its validated choices.
+    let builder: Layout["builder"];
+    if (source.builder !== undefined) {
+      const b = record(source.builder, "İmza düzenleyici bilgisi okunamadı.");
+      if (b.kind !== "quick") throw new Error("İmza düzenleyici türü desteklenmiyor.");
+      const quick = buildQuickLayout(parseQuickConfig(b.config, isSignatureImageUrl));
+      builder = quick.builder;
+      source = quick as unknown as Record<string, unknown>;
+    }
     if (source.version !== 1) throw new Error("İmza düzeninin sürümü desteklenmiyor.");
     const colors = record(source.colors, "İmza renkleri okunamadı.");
     const maxWidth = source.maxWidth === undefined ? 800 : integer(source.maxWidth, 160, 800, "İmza genişliği");
@@ -283,6 +293,7 @@ export function parseVisualLayout(input: unknown): VisualLayoutResult {
       },
       maxWidth,
       elements: readElements(source.elements, maxWidth, true, { total: 0 }),
+      ...(builder ? { builder } : {}),
     };
     const errors = validateLayout(layout).map((error) => {
       const field = /^Unknown field \{\{(.+)\}\}\.$/.exec(error);

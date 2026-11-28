@@ -1,4 +1,5 @@
 import Link from "next/link";
+import { QuickSignatureEditor } from "@/components/quick-signature-editor";
 import { SignatureDesigner } from "@/components/signature-designer";
 import { PageHeader } from "@/components/ui";
 import { requirePanel } from "@/lib/context";
@@ -9,7 +10,8 @@ import { previewVisualTemplateAction, saveVisualTemplateAction } from "../action
 
 export const metadata = { title: "Yeni imza" };
 
-export default async function NewSignature() {
+export default async function NewSignature({ searchParams }: { searchParams: Promise<{ mode?: string }> }) {
+  const advanced = (await searchParams).mode === "advanced";
   const { tenantId, session } = await requirePanel();
   const [me, templates] = await Promise.all([
     session ? data.findUserByEmail(tenantId, session.email) : Promise.resolve(null),
@@ -22,12 +24,24 @@ export default async function NewSignature() {
     <>
       <PageHeader
         title="Yeni imza"
-        actions={<Link href="/signatures" className="text-sm font-medium text-accent underline-offset-4 hover:underline">Tüm imzalar</Link>}
+        actions={
+          <div className="flex items-center gap-4">
+            {advanced && <Link href="/signatures/new" className="text-sm font-medium text-accent underline-offset-4 hover:underline">Hızlı düzenleyici</Link>}
+            <Link href="/signatures" className="text-sm font-medium text-accent underline-offset-4 hover:underline">Tüm imzalar</Link>
+          </div>
+        }
       />
-      <SignatureDesigner
-        action={saveVisualTemplateAction} preview={previewVisualTemplateAction}
-        sources={sources} fields={visualFields} existingNames={existingNames}
-      />
+      {advanced ? (
+        <SignatureDesigner
+          action={saveVisualTemplateAction} preview={previewVisualTemplateAction}
+          sources={sources} fields={visualFields} existingNames={existingNames}
+        />
+      ) : (
+        <QuickSignatureEditor
+          action={saveVisualTemplateAction} preview={previewVisualTemplateAction}
+          sources={sources} advancedHref="/signatures/new?mode=advanced"
+        />
+      )}
     </>
   );
 }

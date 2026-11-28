@@ -38,3 +38,11 @@ export function compactSegments(text: string, values: SegmentValues): { text: st
   return { text: kept.map((k, i) => (i === 0 ? "" : k.sep) + k.seg).join(""), dropped: [...new Set(dropped)] };
 }
 
+
+/** After filling a line: an empty field leaves no double or edge spaces ("{{postal_code}} {{city}}"). */
+export function tidySpaces(filled: string): string {
+  return filled
+    .split("\n")
+    .map((line) => line.replace(/ {2,}/g, " ").trim())
+    .join("\n");
+}

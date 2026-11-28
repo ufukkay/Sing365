@@ -1,5 +1,5 @@
 import type { Align, Column, Element, FieldValues, Layout, VAlign } from "@sing365/render";
-import { compactSegments } from "@sing365/render/segments";
+import { compactSegments, tidySpaces } from "@sing365/render/segments";
 
 export type ColumnsEl = Extract<Element, { type: "columns" }>;
 export type Leaf = Exclude<Element, ColumnsEl>;
@@ -434,7 +434,7 @@ export function canvasText(raw: string, values: FieldValues) {
     if (modifier?.toLowerCase() === "lower") return entry.toLocaleLowerCase("tr-TR");
     return entry;
   });
-  return { value, missing: hasField && !hasValue };
+  return { value: hasField ? tidySpaces(value) : value, missing: hasField && !hasValue };
 }
 
 export function computeMissing(elements: Element[], values: FieldValues): string[] {

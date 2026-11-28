@@ -12,9 +12,9 @@
  * is empty), and the result is always passed through an allow-list sanitiser.
  */
 import sanitizeHtml from "sanitize-html";
-import { compactSegments } from "./segments";
+import { compactSegments, tidySpaces } from "./segments";
 
-export { compactSegments } from "./segments";
+export { compactSegments, tidySpaces } from "./segments";
 
 export type FieldValues = Record<string, string | null | undefined>;
 
@@ -53,6 +53,8 @@ export interface Layout {
   colors: { text: string; muted?: string; link: string; divider?: string };
   maxWidth?: number;
   elements: Element[];
+  /** Settings of the editor that made this layout (e.g. the quick editor). Ignored when rendering. */
+  builder?: { kind: string; config: unknown };
 }
 
 export interface RenderResult {
@@ -328,9 +330,11 @@ function renderElement(ctx: Ctx, el: Element, text: string[], defaultAlign?: Ali
     case "text": {
       const compact = compactSegments(el.text, ctx.values);
       for (const k of compact.dropped) value(ctx, k);
-      const html = fill(ctx, compact.text, escapeHtml)?.replace(/\r\n?|\n/g, "<br>");
-      if (html === undefined) return null;
-      const plain = fill(ctx, compact.text, (x) => x)!;
+      const tidy = placeholdersIn(compact.text).length > 0 ? tidySpaces : (x: string) => x;
+      const filled = fill(ctx, compact.text, escapeHtml);
+      if (filled === null) return null;
+      const html = tidy(filled.replace(/\r\n?/g, "\n")).replace(/\n/g, "<br>");
+      const plain = tidy(fill(ctx, compact.text, (x) => x)!);
       text.push(plain);
       const style = textStyle(ctx, el.style);
       const href = safeHref(ctx, el.href);

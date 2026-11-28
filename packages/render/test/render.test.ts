@@ -53,7 +53,7 @@ describe("render", () => {
     expect(line("T: {{business_phone}} · M: {{mobile_phone}}", { business_phone: "1", mobile_phone: "" })).toBe("T: 1");
     expect(line("T: {{business_phone}} · M: {{mobile_phone}}", { business_phone: "", mobile_phone: "2" })).toBe("M: 2");
     expect(line("{{street_address}}, {{city}} / {{country}}", { street_address: "Kayalar Cd.", city: "", country: "Türkiye" })).toBe("Kayalar Cd. / Türkiye");
-    expect(line("{{given_name}} {{surname}}", { given_name: "Ufuk", surname: "" })).toBe("Ufuk ");
+    expect(line("{{given_name}} {{surname}}", { given_name: "Ufuk", surname: "" })).toBe("Ufuk");
     expect(line("Talay · {{department}}", { department: "BT" })).toBe("Talay · BT");
     // A line whose fields are all empty is still removed as a whole, literal parts included.
     expect(line("Talay · {{department}}", { department: "" })).toBe("");
