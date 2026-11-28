@@ -9,7 +9,7 @@ import { data } from "@/lib/data";
 import { fieldValues } from "@/lib/signature";
 import { quickConfigOf } from "@/lib/quick-signature";
 import { parseVisualLayout, visualFields, visualSampleSources } from "@/lib/visual-signature";
-import { previewVisualTemplateAction, saveVisualTemplateAction } from "../../actions";
+import { previewPeopleAction, previewVisualTemplateAction, saveVisualTemplateAction } from "../../actions";
 
 export const metadata = { title: "İmzayı düzenle" };
 
@@ -58,7 +58,7 @@ export default async function EditSignature({
         <QuickSignatureEditor
           initial={{ id, name: template.name, config: quick, status: template.status, version: template.version }}
           action={saveVisualTemplateAction} preview={previewVisualTemplateAction}
-          sources={sources} artOrigin={publicAssetOrigin()} advancedHref={`/signatures/${id}/edit?mode=advanced`}
+          sources={sources} artOrigin={publicAssetOrigin()} findPeople={previewPeopleAction} advancedHref={`/signatures/${id}/edit?mode=advanced`}
         />
       </>
     );

@@ -32,6 +32,8 @@ export interface QuickSignatureEditorProps {
   preview: (layout: Layout, values: FieldValues) => Promise<Preview>;
   /** Where "Gelişmiş düzenleyici" goes. */
   advancedHref: string;
+  /** Searches employees for the preview; without it only `sources` can be chosen. */
+  findPeople?: (query: string) => Promise<{ label: string; values: FieldValues }[]>;
   /** Public origin for social icons and the preview logo; null shows social links as text. */
   artOrigin: string | null;
 }
@@ -133,7 +135,21 @@ function TemplateGallery({
   );
 }
 
-export function QuickSignatureEditor({ initial, sources, action, preview, advancedHref, artOrigin }: QuickSignatureEditorProps) {
+const FIELD_LABELS: Record<string, string> = {
+  ...Object.fromEntries(QUICK_FIELDS.map((f) => [f.key, f.label])),
+  display_name: "Ad soyad",
+  street_address: "Adres",
+  postal_code: "Posta kodu",
+  city: "Şehir",
+  country: "Ülke",
+};
+
+export function QuickSignatureEditor({ initial, sources: given, action, preview, advancedHref, artOrigin, findPeople }: QuickSignatureEditorProps) {
+  const [found, setFound] = useState<{ label: string; values: FieldValues }[]>([]);
+  const [query, setQuery] = useState("");
+  const [searching, setSearching] = useState(false);
+  const [searched, setSearched] = useState("");
+  const sources = useMemo(() => [...given, ...found], [given, found]);
   const uid = useId();
   const [name, setName] = useState(initial?.name ?? "");
   const [config, setConfig] = useState<QuickConfig>(initial?.config ?? DEFAULT_QUICK_CONFIG);
@@ -186,6 +202,22 @@ export function QuickSignatureEditor({ initial, sources, action, preview, advanc
       if (fileRef.current) fileRef.current.value = "";
     }
   }
+
+  async function searchPeople(q: string) {
+    if (!findPeople || q.trim().length < 2) return;
+    setSearching(true);
+    try {
+      const people = await findPeople(q);
+      setFound(people);
+      setSearched(q);
+      if (people.length) setSource(given.length);
+    } finally {
+      setSearching(false);
+    }
+  }
+  const hidden = result
+    ? [...new Set(result.missing.map((k) => (["street_address", "postal_code", "city", "country"].includes(k) ? "Adres" : FIELD_LABELS[k])).filter(Boolean))]
+    : [];
 
   const socialOn = (id: string) => config.social.some((s) => s.network === id);
 
@@ -425,16 +457,41 @@ export function QuickSignatureEditor({ initial, sources, action, preview, advanc
         <div className={card}>
           <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
             <h2 className="text-sm font-semibold text-text">Önizleme</h2>
-            {sources.length > 1 && (
-              <select aria-label="Önizleme kişisi" value={source} onChange={(e) => setSource(Number(e.target.value))} className="h-8 rounded-md border border-border-input bg-bg px-2 text-xs text-text">
-                {sources.map((s, i) => (
-                  <option key={i} value={i}>
-                    {s.label}
-                  </option>
-                ))}
-              </select>
-            )}
+            <select aria-label="Önizleme kişisi" value={source} onChange={(e) => setSource(Number(e.target.value))} className="h-8 max-w-[260px] rounded-md border border-border-input bg-bg px-2 text-xs text-text">
+              {sources.map((s, i) => (
+                <option key={i} value={i}>
+                  {s.label}
+                </option>
+              ))}
+            </select>
           </div>
+          {findPeople && (
+            <div className="mb-3 flex gap-2">
+              <input
+                type="search"
+                aria-label="Çalışan ara"
+                value={query}
+                onChange={(e) => setQuery(e.target.value)}
+                onKeyDown={(e) => {
+                  if (e.key === "Enter") {
+                    e.preventDefault();
+                    void searchPeople(query);
+                  }
+                }}
+                placeholder="Bir çalışanın imzasını görmek için adını veya e-postasını yazın"
+                className={`${inputClass} h-8 text-xs`}
+              />
+              <button
+                type="button"
+                onClick={() => searchPeople(query)}
+                disabled={searching || query.trim().length < 2}
+                className="h-8 shrink-0 rounded-md border border-border px-3 text-xs font-semibold text-text hover:bg-surface disabled:opacity-50"
+              >
+                {searching ? "Aranıyor…" : "Ara"}
+              </button>
+            </div>
+          )}
+          {searched && !searching && found.length === 0 && <p className="-mt-1 mb-3 text-xs text-text-muted">“{searched}” ile eşleşen çalışan bulunamadı.</p>}
           <div className="rounded-md border border-border bg-white p-5">
             {result ? (
               <iframe
@@ -452,8 +509,10 @@ export function QuickSignatureEditor({ initial, sources, action, preview, advanc
               Önizlemede eksik logo, web sitesi veya sosyal medya adresleri için örnek gösteriliyor; bunlar kaydedilmez.
             </p>
           )}
-          {result && result.missing.length > 0 && (
-            <p className="mt-2 text-xs text-text-muted">Bu kişide boş olduğu için gizlenen bilgiler var; diğer çalışanlarda dolu ise görünür.</p>
+          {hidden.length > 0 && (
+            <p className="mt-2 text-xs text-text-muted">
+              Bu kişinin Microsoft 365 kaydında boş olduğu için gizlenenler: <span className="font-medium text-text">{hidden.join(", ")}</span>. Dolu olan çalışanlarda görünür.
+            </p>
           )}
         </div>
 

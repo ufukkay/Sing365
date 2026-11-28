@@ -6,6 +6,7 @@ import type { Mode, Rule } from "@sing365/rules";
 import { requirePanel } from "@/lib/context";
 import { data } from "@/lib/data";
 import { htmlLayout, htmlProblems } from "@/lib/html-template";
+import { fieldValues } from "@/lib/signature";
 import { addStarterTemplates } from "@/lib/starter";
 import { hasSignatureContent, parseVisualLayout, simpleVisualRule } from "@/lib/visual-signature";
 
@@ -61,6 +62,15 @@ function submittedLayout(form: FormData) {
   } catch {
     return parseVisualLayout(null);
   }
+}
+
+/** Finds employees by name or e-mail, to preview a signature with their own directory data. */
+export async function previewPeopleAction(query: string): Promise<{ label: string; values: FieldValues }[]> {
+  const { tenantId } = await requirePanel();
+  const q = typeof query === "string" ? query.trim().slice(0, 100) : "";
+  if (q.length < 2) return [];
+  const users = await data.listUsers(tenantId, { q, limit: 8 });
+  return users.map((u) => ({ label: `${u.displayName}${u.email ? ` · ${u.email}` : ""}`, values: fieldValues(u) }));
 }
 
 export async function previewVisualTemplateAction(layout: Layout, values: FieldValues) {

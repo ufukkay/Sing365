@@ -7,7 +7,7 @@ import { requirePanel } from "@/lib/context";
 import { data } from "@/lib/data";
 import { fieldValues } from "@/lib/signature";
 import { visualFields, visualSampleSources } from "@/lib/visual-signature";
-import { previewVisualTemplateAction, saveVisualTemplateAction } from "../actions";
+import { previewPeopleAction, previewVisualTemplateAction, saveVisualTemplateAction } from "../actions";
 
 export const metadata = { title: "Yeni imza" };
 
@@ -40,7 +40,7 @@ export default async function NewSignature({ searchParams }: { searchParams: Pro
       ) : (
         <QuickSignatureEditor
           action={saveVisualTemplateAction} preview={previewVisualTemplateAction}
-          sources={sources} artOrigin={publicAssetOrigin()} advancedHref="/signatures/new?mode=advanced"
+          sources={sources} artOrigin={publicAssetOrigin()} findPeople={previewPeopleAction} advancedHref="/signatures/new?mode=advanced"
         />
       )}
     </>
