@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { render } from "@sing365/render";
+import { layoutForMessage, render } from "@sing365/render";
 import { applyQuickTemplate, buildQuickLayout, DEFAULT_QUICK_CONFIG, matchingQuickTemplate, QUICK_TEMPLATES, quickConfigOf, withSamples, type QuickConfig } from "../lib/quick-signature";
 import { artPng } from "../lib/signature-art";
 import { parseVisualLayout } from "../lib/visual-signature";
@@ -124,5 +124,36 @@ describe("signature art", () => {
     for (const bad of ["instagram-0f172a.svg", "tiktok-000000.png", "linkedin-12345.png", "../linkedin-000000.png", "linkedin-ABCDEF.png"]) {
       expect(artPng(bad)).toBeNull();
     }
+  });
+});
+
+describe("replies and outside-only footer", () => {
+  it("uses the short version for replies and keeps the full one for new mail", () => {
+    const built = buildQuickLayout(config({ logo, replyStyle: "short", disclaimer: "Gizlidir." }));
+    const parsed = parseVisualLayout(JSON.parse(JSON.stringify(built))).layout!;
+    const reply = render(layoutForMessage(parsed, { reply: true, external: true }), person);
+    const fresh = render(layoutForMessage(parsed, { reply: false, external: true }), person);
+    expect(reply.text).toContain("Ayşe Yılmaz");
+    expect(reply.text).toContain("Operasyon Müdürü · Pera Lojistik");
+    expect(reply.text).toContain("T: +90 212 000 00 01 · ayse@pera.example");
+    expect(reply.text).toContain("Gizlidir.");
+    expect(reply.html).not.toContain("logo.png");
+    expect(fresh.html).toContain("logo.png");
+  });
+
+  it("adds an outside-only footer only when a recipient is outside", () => {
+    const built = buildQuickLayout(config({ disclaimer: "Yasal uyarı.", disclaimerScope: "external" }));
+    const parsed = parseVisualLayout(JSON.parse(JSON.stringify(built))).layout!;
+    expect(render(layoutForMessage(parsed, { reply: false, external: true }), person).text).toContain("Yasal uyarı.");
+    expect(render(layoutForMessage(parsed, { reply: false, external: false }), person).text).not.toContain("Yasal uyarı.");
+    expect(quickConfigOf(parsed)?.disclaimerScope).toBe("external");
+  });
+
+  it("reads older quick signatures without the new choices as full signatures", () => {
+    const { disclaimerScope: _a, replyStyle: _b, ...old } = config();
+    const parsed = parseVisualLayout({ ...buildQuickLayout(config()), builder: { kind: "quick", config: old } });
+    expect(parsed.errors).toEqual([]);
+    expect(quickConfigOf(parsed.layout)).toMatchObject({ disclaimerScope: "all", replyStyle: "full" });
+    expect(parsed.layout!.reply).toBeUndefined();
   });
 });

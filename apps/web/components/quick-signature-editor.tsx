@@ -29,7 +29,7 @@ export interface QuickSignatureEditorProps {
   initial?: { id: string; name: string; config: QuickConfig; version: number; status: string };
   sources: { label: string; values: FieldValues }[];
   action: (state: FormState, form: FormData) => Promise<FormState>;
-  preview: (layout: Layout, values: FieldValues) => Promise<Preview>;
+  preview: (layout: Layout, values: FieldValues, message?: { reply?: boolean; external?: boolean }) => Promise<Preview>;
   /** Where "Gelişmiş düzenleyici" goes. */
   advancedHref: string;
   /** Searches employees for the preview; without it only `sources` can be chosen. */
@@ -161,6 +161,7 @@ export function QuickSignatureEditor({ initial, sources: given, action, preview,
   const fileRef = useRef<HTMLInputElement>(null);
 
   const [choosing, setChoosing] = useState(!initial);
+  const [asReply, setAsReply] = useState(false);
   const layout = useMemo(() => buildQuickLayout(config, artOrigin), [config, artOrigin]);
   const sample = useMemo(() => withSamples(config, artOrigin), [config, artOrigin]);
   const previewLayout = useMemo(() => buildQuickLayout(sample.config, artOrigin), [sample, artOrigin]);
@@ -172,7 +173,7 @@ export function QuickSignatureEditor({ initial, sources: given, action, preview,
   useEffect(() => {
     let live = true;
     const timer = setTimeout(() => {
-      preview(previewLayout, sources[source]?.values ?? {})
+      preview(previewLayout, sources[source]?.values ?? {}, { reply: asReply && config.replyStyle === "short", external: true })
         .then((r) => live && setResult(r))
         .catch(() => live && setResult(null));
     }, 250);
@@ -180,7 +181,7 @@ export function QuickSignatureEditor({ initial, sources: given, action, preview,
       live = false;
       clearTimeout(timer);
     };
-  }, [previewLayout, preview, source, sources]);
+  }, [previewLayout, preview, source, sources, asReply, config.replyStyle]);
 
   async function upload(file: File) {
     setUploadError("");
@@ -450,13 +451,80 @@ export function QuickSignatureEditor({ initial, sources: given, action, preview,
             placeholder="Örn. Bu e-posta ve ekleri gizlidir; yalnızca alıcısı içindir."
             className="w-full rounded-md border border-border-input bg-bg px-3 py-2 text-sm text-text placeholder:text-text-muted"
           />
+          {config.disclaimer.trim() && (
+            <fieldset className="mt-3">
+              <legend className="mb-1.5 text-sm font-medium text-text">Ne zaman eklensin?</legend>
+              {(
+                [
+                  ["all", "Tüm postalarda"],
+                  ["external", "Sadece şirket dışına giden postalarda"],
+                ] as const
+              ).map(([value, label]) => (
+                <label key={value} className="flex items-center gap-2 py-0.5 text-sm text-text">
+                  <input
+                    type="radio"
+                    name={`${uid}-dscope`}
+                    checked={config.disclaimerScope === value}
+                    onChange={() => set({ disclaimerScope: value })}
+                    className="size-4 accent-[var(--s365-color-accent)]"
+                  />
+                  {label}
+                </label>
+              ))}
+            </fieldset>
+          )}
+        </section>
+
+        <section className={card} aria-labelledby={`${uid}-s6`}>
+          <h2 id={`${uid}-s6`} className={stepTitle}>
+            <span className={stepNumber}>5</span> Yanıt ve iletmelerde
+          </h2>
+          <div className="grid grid-cols-2 gap-2">
+            {(
+              [
+                ["full", "Tam imza", "Her postada aynı imza"],
+                ["short", "Kısa imza", "Ad, unvan ve tek satır iletişim"],
+              ] as const
+            ).map(([value, title, hint]) => (
+              <button
+                key={value}
+                type="button"
+                aria-pressed={config.replyStyle === value}
+                onClick={() => {
+                  set({ replyStyle: value });
+                  setAsReply(value === "short");
+                }}
+                className={`rounded-md border p-3 text-left ${config.replyStyle === value ? "border-accent bg-accent-subtle" : "border-border bg-bg hover:bg-surface"}`}
+              >
+                <span className="block text-sm font-semibold text-text">{title}</span>
+                <span className="block text-xs text-text-muted">{hint}</span>
+              </button>
+            ))}
+          </div>
         </section>
       </div>
 
       <div className="flex flex-col gap-4 lg:sticky lg:top-4 lg:self-start">
         <div className={card}>
           <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
-            <h2 className="text-sm font-semibold text-text">Önizleme</h2>
+            <div className="flex items-center gap-3">
+              <h2 className="text-sm font-semibold text-text">Önizleme</h2>
+              {config.replyStyle === "short" && (
+                <div role="group" aria-label="Önizlenen posta" className="inline-flex rounded-md border border-border p-0.5 text-xs">
+                  {[false, true].map((reply) => (
+                    <button
+                      key={String(reply)}
+                      type="button"
+                      aria-pressed={asReply === reply}
+                      onClick={() => setAsReply(reply)}
+                      className={`rounded px-2 py-1 font-medium ${asReply === reply ? "bg-accent text-on-accent" : "text-text-muted hover:text-text"}`}
+                    >
+                      {reply ? "Yanıt" : "Yeni posta"}
+                    </button>
+                  ))}
+                </div>
+              )}
+            </div>
             <select aria-label="Önizleme kişisi" value={source} onChange={(e) => setSource(Number(e.target.value))} className="h-8 max-w-[260px] rounded-md border border-border-input bg-bg px-2 text-xs text-text">
               {sources.map((s, i) => (
                 <option key={i} value={i}>

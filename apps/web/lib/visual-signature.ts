@@ -272,11 +272,14 @@ export function parseVisualLayout(input: unknown): VisualLayoutResult {
     let source = record(input, "İmza düzeni okunamadı.");
     // A quick-editor signature: the blocks are always rebuilt here from its validated choices.
     let builder: Layout["builder"];
+    let extras: Pick<Layout, "reply" | "externalOnly"> = {};
     if (source.builder !== undefined) {
       const b = record(source.builder, "İmza düzenleyici bilgisi okunamadı.");
       if (b.kind !== "quick") throw new Error("İmza düzenleyici türü desteklenmiyor.");
       const quick = buildQuickLayout(parseQuickConfig(b.config, isSignatureImageUrl), publicAssetOrigin());
       builder = quick.builder;
+      // Built here from validated choices, like the main blocks.
+      extras = { ...(quick.reply ? { reply: quick.reply } : {}), ...(quick.externalOnly ? { externalOnly: quick.externalOnly } : {}) };
       source = quick as unknown as Record<string, unknown>;
     }
     if (source.version !== 1) throw new Error("İmza düzeninin sürümü desteklenmiyor.");
@@ -294,6 +297,7 @@ export function parseVisualLayout(input: unknown): VisualLayoutResult {
       },
       maxWidth,
       elements: readElements(source.elements, maxWidth, true, { total: 0 }),
+      ...extras,
       ...(builder ? { builder } : {}),
     };
     const errors = validateLayout(layout).map((error) => {

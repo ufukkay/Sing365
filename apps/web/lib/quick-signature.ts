@@ -64,6 +64,10 @@ export interface QuickConfig {
   social: { network: QuickSocial; url: string }[];
   /** Small text under the signature (legal notice, confidentiality). */
   disclaimer: string;
+  /** "external": the footer text is added only when the message goes outside the company. */
+  disclaimerScope: "all" | "external";
+  /** "short": replies and forwards get only the name, title and one contact line. */
+  replyStyle: "full" | "short";
 }
 
 export const DEFAULT_QUICK_CONFIG: QuickConfig = {
@@ -83,6 +87,8 @@ export const DEFAULT_QUICK_CONFIG: QuickConfig = {
   website: "",
   social: [],
   disclaimer: "",
+  disclaimerScope: "all",
+  replyStyle: "full",
 };
 
 export const LOGO_MIN = 40;
@@ -283,8 +289,27 @@ export function buildQuickLayout(config: QuickConfig, artOrigin: string | null =
       elements = [...identity, { type: "divider", color: c.color }, ...contact];
       break;
   }
+  // Replies and forwards: name, title/company and one contact line.
+  let reply: Element[] | undefined;
+  if (c.replyStyle === "short") {
+    const shortContact = [
+      show.business_phone ? "T: {{business_phone}}" : show.mobile_phone ? "M: {{mobile_phone}}" : "",
+      show.email ? "{{email}}" : "",
+    ].filter(Boolean);
+    reply = [{ type: "text", text: "{{display_name}}", style: { size: 13, bold: true, color: c.color } }];
+    const role = [show.job_title && "{{job_title}}", show.company_name && "{{company_name}}"].filter(Boolean);
+    if (role.length) reply.push({ type: "text", text: role.join(" · "), style: { size: 12, color: TEXT } });
+    if (shortContact.length) reply.push({ type: "text", text: shortContact.join(" · "), style: { size: 12, color: MUTED } });
+  }
+
+  let externalOnly: Element[] | undefined;
   if (c.disclaimer.trim()) {
-    elements = [...elements, { type: "spacer", height: 12 }, { type: "text", text: c.disclaimer.trim(), style: { size: 11, color: MUTED } }];
+    const footer: Element[] = [{ type: "spacer", height: 12 }, { type: "text", text: c.disclaimer.trim(), style: { size: 11, color: MUTED } }];
+    if (c.disclaimerScope === "external") externalOnly = footer;
+    else {
+      elements = [...elements, ...footer];
+      if (reply) reply = [...reply, ...footer];
+    }
   }
 
   return {
@@ -294,6 +319,8 @@ export function buildQuickLayout(config: QuickConfig, artOrigin: string | null =
     maxWidth: 600,
     colors: { text: TEXT, link: c.color, divider: c.color, muted: MUTED },
     elements,
+    ...(reply ? { reply } : {}),
+    ...(externalOnly ? { externalOnly } : {}),
     builder: { kind: "quick", config: c },
   };
 }
@@ -361,7 +388,9 @@ export function parseQuickConfig(input: unknown, isImageUrl: (url: string) => bo
   if (typeof input.disclaimer !== "string" || input.disclaimer.length > 1000) throw new Error("Alt bilgi metni en fazla 1000 karakter olabilir.");
   if (/\{\{|\}\}/.test(input.disclaimer)) throw new Error("Alt bilgi metninde {{ }} kullanılamaz.");
 
-  return { style, color: input.color.toLowerCase(), font, logo, show, website, social, disclaimer: input.disclaimer };
+  const disclaimerScope = input.disclaimerScope === "external" ? "external" : "all";
+  const replyStyle = input.replyStyle === "short" ? "short" : "full";
+  return { style, color: input.color.toLowerCase(), font, logo, show, website, social, disclaimer: input.disclaimer, disclaimerScope, replyStyle };
 }
 
 /** The quick choices stored with a layout, if it was made in the quick editor. */

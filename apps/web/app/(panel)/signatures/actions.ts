@@ -1,7 +1,7 @@
 "use server";
 import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
-import { render, type FieldValues, type Layout } from "@sing365/render";
+import { layoutForMessage, render, type FieldValues, type Layout } from "@sing365/render";
 import type { Mode, Rule } from "@sing365/rules";
 import { requirePanel } from "@/lib/context";
 import { data } from "@/lib/data";
@@ -73,7 +73,7 @@ export async function previewPeopleAction(query: string): Promise<{ label: strin
   return users.map((u) => ({ label: `${u.displayName}${u.email ? ` · ${u.email}` : ""}`, values: fieldValues(u) }));
 }
 
-export async function previewVisualTemplateAction(layout: Layout, values: FieldValues) {
+export async function previewVisualTemplateAction(layout: Layout, values: FieldValues, message?: { reply?: boolean; external?: boolean }) {
   await requirePanel();
   const parsed = parseVisualLayout(layout);
   if (!parsed.layout) return { html: "", text: "", missing: [] };
@@ -81,7 +81,8 @@ export async function previewVisualTemplateAction(layout: Layout, values: FieldV
   for (const [key, value] of Object.entries(values ?? {}).slice(0, 100)) {
     if (/^[a-z][a-z0-9_.]{0,99}$/.test(key) && typeof value === "string") previewValues[key] = value.slice(0, 500);
   }
-  const { html, text, missing } = render(parsed.layout, previewValues);
+  const forMessage = layoutForMessage(parsed.layout, { reply: message?.reply === true, external: message?.external !== false });
+  const { html, text, missing } = render(forMessage, previewValues);
   return { html, text, missing };
 }
 

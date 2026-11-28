@@ -55,6 +55,19 @@ export interface Layout {
   elements: Element[];
   /** Settings of the editor that made this layout (e.g. the quick editor). Ignored when rendering. */
   builder?: { kind: string; config: unknown };
+  /** Shorter blocks used instead of `elements` for replies and forwards. */
+  reply?: Element[];
+  /** Blocks added at the end only when the message goes outside the company (e.g. a legal notice). */
+  externalOnly?: Element[];
+}
+
+/** The blocks to render for one message: the reply version for replies, plus the
+ * outside-only blocks when a recipient is outside the company. */
+export function layoutForMessage(layout: Layout, message: { reply: boolean; external: boolean }): Layout {
+  const { reply, externalOnly, ...rest } = layout;
+  const base = message.reply && reply?.length ? reply : layout.elements;
+  const elements = message.external && externalOnly?.length ? [...base, ...externalOnly] : base;
+  return { ...rest, elements };
 }
 
 export interface RenderResult {
