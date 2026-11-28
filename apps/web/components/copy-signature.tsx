@@ -2,10 +2,6 @@
 import { useState } from "react";
 import { Button } from "./ui";
 
-/**
- * Copies a rendered signature as rich text (HTML, with a plain-text fallback) so it can be
- * pasted into Outlook's own signature settings: a manual way to try it before the add-in is deployed.
- */
 export function CopySignature({ html, text }: { html: string; text: string }) {
   const [state, setState] = useState<"idle" | "done" | "plain" | "failed">("idle");
 
@@ -33,15 +29,15 @@ export function CopySignature({ html, text }: { html: string; text: string }) {
       <Button type="button" variant="secondary" onClick={copy}>
         İmzayı kopyala
       </Button>
-      <p className="text-xs text-text-muted" aria-live="polite">
-        {state === "done"
-          ? "Kopyalandı. Outlook'un imza ayarlarındaki kutuya Ctrl+V ile yapıştırın."
-          : state === "plain"
-            ? "Bu tarayıcı yalnızca düz metin kopyaladı; biçimli kopya için Chrome ya da Edge kullanın."
-            : state === "failed"
-            ? "Kopyalanamadı. İmzayı fareyle seçip Ctrl+C ile kopyalayın."
-            : "Outlook'un imza ayarlarına yapıştırarak gerçek bir e-postada deneyebilirsiniz."}
-      </p>
+      {state !== "idle" && (
+        <p className="text-xs text-text-muted" aria-live="polite">
+          {state === "done"
+            ? "Kopyalandı."
+            : state === "plain"
+              ? "Düz metin olarak kopyalandı."
+              : "Kopyalanamadı."}
+        </p>
+      )}
     </div>
   );
 }

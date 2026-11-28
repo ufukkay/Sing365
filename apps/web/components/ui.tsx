@@ -102,10 +102,10 @@ export function Badge({ tone = "neutral", icon, children }: { tone?: Tone; icon?
 
 export function Card({ title, actions, children, className }: { title?: string; actions?: ReactNode; children: ReactNode; className?: string }) {
   return (
-    <section className={cx("rounded-lg border border-border bg-surface-raised p-5 shadow-card", className)}>
+    <section className={cx("rounded-lg border border-border bg-surface-raised p-4 shadow-card", className)}>
       {(title || actions) && (
-        <header className="mb-4 flex items-center justify-between gap-4">
-          {title && <h2 className="text-lg font-semibold">{title}</h2>}
+        <header className="mb-3 flex items-center justify-between gap-3">
+          {title && <h2 className="text-base font-semibold">{title}</h2>}
           {actions}
         </header>
       )}
@@ -124,11 +124,11 @@ export function StatTile({ label, value, note }: { label: string; value: ReactNo
   );
 }
 
-export function EmptyState({ title, body, action }: { title: string; body: string; action?: ReactNode }) {
+export function EmptyState({ title, body, action }: { title: string; body?: string; action?: ReactNode }) {
   return (
     <div className="flex flex-col items-center gap-2 rounded-lg border border-dashed border-border px-6 py-10 text-center">
       <p className="text-base font-semibold">{title}</p>
-      <p className="max-w-md text-sm text-text-muted">{body}</p>
+      {body && <p className="max-w-md text-sm text-text-muted">{body}</p>}
       {action && <div className="mt-2">{action}</div>}
     </div>
   );
@@ -136,10 +136,10 @@ export function EmptyState({ title, body, action }: { title: string; body: strin
 
 export function PageHeader({ title, description, actions }: { title: string; description?: string; actions?: ReactNode }) {
   return (
-    <div className="mb-6 flex flex-wrap items-end justify-between gap-4">
+    <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
       <div>
-        <h1 className="text-2xl font-bold">{title}</h1>
-        {description && <p className="mt-1 max-w-2xl text-sm text-text-muted">{description}</p>}
+        <h1 className="text-xl font-bold">{title}</h1>
+        {description && <p className="mt-0.5 max-w-2xl text-xs text-text-muted">{description}</p>}
       </div>
       {actions}
     </div>

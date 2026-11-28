@@ -1,5 +1,7 @@
+import Link from "next/link";
 import { CircleCheck } from "lucide-react";
 import { Sidebar } from "@/components/sidebar";
+import { ThemePicker } from "@/components/theme-picker";
 import { Badge } from "@/components/ui";
 import { data } from "@/lib/data";
 import { requirePanel } from "@/lib/context";
@@ -11,29 +13,39 @@ export default async function PanelLayout({ children }: { children: React.ReactN
   const tenant = await data.getTenant(tenantId);
   const sync = await data.getSyncStatus(tenantId);
   return (
-    <div className="grid min-h-screen grid-rows-[56px_auto_1fr] lg:grid-rows-[56px_1fr] lg:grid-cols-[248px_1fr]">
-      <header className="col-span-full flex items-center gap-4 border-b border-border bg-bg px-4">
+    <div className="flex min-h-screen flex-col">
+      <header className="sticky top-0 z-20 flex min-h-13 flex-wrap items-center gap-x-4 gap-y-2 border-b border-border bg-bg px-4 py-2">
         <a href="#main" className="sr-only focus:not-sr-only">
           İçeriğe geç
         </a>
-        <span className="text-lg font-bold text-accent">Sigwide</span>
-        <span className="truncate text-sm text-text-muted">{tenant?.name}</span>
-        <span className="ml-auto flex items-center gap-2">
+        <Link href="/" className="shrink-0 text-base font-bold tracking-tight text-accent">
+          Sigwide
+        </Link>
+        <div className="hidden md:block">
+          <Sidebar />
+        </div>
+        <div className="ml-auto flex flex-wrap items-center gap-2">
+          {tenant?.name && (
+            <span className="hidden max-w-[180px] truncate text-xs font-medium text-text-muted xl:inline">
+              {tenant.name}
+            </span>
+          )}
+          <ThemePicker />
           {session && (
             <form action="/api/sync" method="post">
               <button type="submit" className="rounded-md px-2 py-1 text-xs font-medium text-accent hover:bg-accent-subtle">
-                Şimdi senkronla
+                Eşitle
               </button>
             </form>
           )}
           {sync.state === "succeeded" ? (
             <Badge tone="success" icon={<CircleCheck aria-hidden className="size-3" />}>
-              Dizin senkron
+              Dizin güncel
             </Badge>
           ) : sync.state === "failed" ? (
-            <Badge tone="danger">Senkron hatası</Badge>
+            <Badge tone="danger">Eşitleme hatası</Badge>
           ) : (
-            <Badge tone="warning">Senkron bekliyor</Badge>
+            <Badge tone="warning">Eşitleme bekliyor</Badge>
           )}
           {session && (
             <form action="/api/auth/signout" method="post">
@@ -42,17 +54,14 @@ export default async function PanelLayout({ children }: { children: React.ReactN
               </button>
             </form>
           )}
-        </span>
+        </div>
       </header>
-      <details className="border-b border-border bg-bg lg:hidden">
+      <details className="border-b border-border bg-bg md:hidden">
         <summary className="cursor-pointer px-4 py-2 text-sm font-medium">Menü</summary>
-        <Sidebar />
+        <Sidebar vertical />
       </details>
-      <aside className="hidden border-r border-border bg-bg lg:block">
-        <Sidebar />
-      </aside>
-      <main id="main" className="min-w-0 bg-surface px-4 py-6 sm:px-8">
-        <div className="mx-auto max-w-[1200px]">{children}</div>
+      <main id="main" className="sigwide-panel-canvas flex-1 min-w-0 bg-surface px-4 py-4 sm:px-5">
+        <div className="w-full">{children}</div>
       </main>
     </div>
   );
