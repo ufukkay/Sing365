@@ -60,7 +60,7 @@ export default async function SignaturePreview({
                 href={{ pathname: "/signatures/apply", query: { template: id } }}
                 className="inline-flex h-9 items-center rounded-md border border-border bg-surface-raised px-3.5 text-sm font-semibold text-text hover:bg-surface"
               >
-                Uygula
+                Kimlere uygulanır
               </Link>
             )}
             {visual && (
@@ -84,7 +84,7 @@ export default async function SignaturePreview({
           <div className="flex flex-wrap items-center gap-2.5">
             <PersonSwitcher templateId={template.id} people={people} selectedId={user?.id} />
             {template.status === "published" ? (
-              <Badge tone="success">Aktif</Badge>
+              <Badge tone="success">Kullanımda</Badge>
             ) : (
               <Badge>{template.status === "archived" ? "Arşiv" : "Taslak"}</Badge>
             )}

@@ -13,11 +13,11 @@ import { changeTemplateArchiveAction, deleteArchivedSignatureAction } from "./ac
 export const metadata = { title: "İmzalar" };
 
 const notices: Record<string, { text: string; error?: true }> = {
-  archived: { text: "Şablon arşive taşındı." },
-  restored: { text: "Şablon taslaklara geri alındı." },
-  deleted: { text: "Şablon silindi." },
-  conflict: { text: "Şablonun durumu değişti. Geçerli sürümü kontrol edin.", error: true },
-  "delete-blocked": { text: "Şablon silinemedi. Şablon başka bir kayda bağlı olabilir veya sürümü değişmiş olabilir.", error: true },
+  archived: { text: "İmza arşive taşındı." },
+  restored: { text: "İmza taslaklara geri alındı." },
+  deleted: { text: "İmza silindi." },
+  conflict: { text: "İmzanın durumu değişti. Sayfayı yenileyip tekrar deneyin.", error: true },
+  "delete-blocked": { text: "İmza silinemedi. Sayfayı yenileyip tekrar deneyin.", error: true },
 };
 
 const date = new Intl.DateTimeFormat("tr-TR", { dateStyle: "medium", timeZone: "Europe/Istanbul" });
@@ -65,7 +65,7 @@ function DeleteButton({ template }: { template: Template }) {
       <form action={deleteArchivedSignatureAction} className="mt-2 grid max-w-64 gap-2 rounded-md border border-border bg-surface p-3 text-xs">
         <input type="hidden" name="id" value={template.id} />
         <input type="hidden" name="version" value={template.version} />
-        <p className="text-text-muted">Bu şablon ve uygulama kuralları kalıcı olarak silinecek.</p>
+        <p className="text-text-muted">Bu imza ve kuralları kalıcı olarak silinecek.</p>
         <Button type="submit" variant="danger" size="sm" name="confirm" value="yes">Kalıcı olarak sil</Button>
       </form>
     </details>

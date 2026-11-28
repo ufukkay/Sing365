@@ -2,13 +2,12 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { LayoutDashboard, PenLine, Plug, Send, Users } from "lucide-react";
+import { LayoutDashboard, PenLine, Plug, Users } from "lucide-react";
 import { cx } from "./ui";
 
 const nav = [
   { href: "/", label: "Genel bakış", icon: LayoutDashboard },
   { href: "/signatures", label: "İmzalar", icon: PenLine },
-  { href: "/signatures/apply", label: "İmza uygulama", icon: Send },
   { href: "/users", label: "Kişiler", icon: Users },
   { href: "/exchange", label: "Exchange bağlantısı", icon: Plug },
 ];
@@ -24,7 +23,7 @@ export function Sidebar({ vertical = false }: { vertical?: boolean }) {
         const active =
           href === "/"
             ? path === "/"
-            : path === href || (path.startsWith(`${href}/`) && !(href === "/signatures" && path === "/signatures/apply"));
+            : path === href || path.startsWith(`${href}/`);
         return (
           <Link
             key={href}

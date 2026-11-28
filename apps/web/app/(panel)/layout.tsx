@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { CircleCheck } from "lucide-react";
+import { CircleCheck, LogOut, RefreshCw } from "lucide-react";
 import { Sidebar } from "@/components/sidebar";
 import { ThemePicker } from "@/components/theme-picker";
 import { Badge } from "@/components/ui";
@@ -26,18 +26,11 @@ export default async function PanelLayout({ children }: { children: React.ReactN
         </div>
         <div className="ml-auto flex flex-wrap items-center gap-2">
           {tenant?.name && (
-            <span className="hidden max-w-[180px] truncate text-xs font-medium text-text-muted xl:inline">
+            <span className="hidden max-w-[200px] truncate text-xs font-medium text-text-muted lg:inline">
               {tenant.name}
             </span>
           )}
           <ThemePicker />
-          {session && (
-            <form action="/api/sync" method="post">
-              <button type="submit" className="rounded-md px-2 py-1 text-xs font-medium text-accent hover:bg-accent-subtle">
-                Eşitle
-              </button>
-            </form>
-          )}
           {sync.state === "succeeded" ? (
             <Badge tone="success" icon={<CircleCheck aria-hidden className="size-3" />}>
               Dizin güncel
@@ -48,9 +41,17 @@ export default async function PanelLayout({ children }: { children: React.ReactN
             <Badge tone="warning">Eşitleme bekliyor</Badge>
           )}
           {session && (
+            <form action="/api/sync" method="post">
+              <button type="submit" title="Dizini şimdi eşitle" aria-label="Dizini şimdi eşitle" className="inline-flex size-7 items-center justify-center rounded-md text-text-muted hover:bg-surface hover:text-accent">
+                <RefreshCw aria-hidden className="size-3.5" />
+              </button>
+            </form>
+          )}
+          <span aria-hidden className="mx-1 hidden h-5 w-px bg-border sm:block" />
+          {session && (
             <form action="/api/auth/signout" method="post">
-              <button type="submit" className="rounded-md px-2 py-1 text-xs text-text-muted hover:bg-surface" title={session.email}>
-                Çıkış
+              <button type="submit" className="inline-flex items-center gap-1.5 rounded-md px-2 py-1 text-xs text-text-muted hover:bg-surface hover:text-text" title={`${session.email} oturumunu kapat`}>
+                <LogOut aria-hidden className="size-3.5" /> Çıkış
               </button>
             </form>
           )}

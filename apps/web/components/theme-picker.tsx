@@ -69,14 +69,13 @@ export function ThemePicker() {
             aria-label={label}
             aria-pressed={active}
             onClick={() => choose(value)}
-            className={`inline-flex h-7 items-center gap-1 rounded-md px-2 text-xs font-medium transition-colors ${
+            className={`inline-flex size-7 items-center justify-center rounded-md text-xs font-medium transition-colors ${
               active
                 ? "bg-surface-raised text-accent shadow-xs"
                 : "text-text-muted hover:text-text"
             }`}
           >
             <Icon aria-hidden="true" className="size-3.5" />
-            <span className="hidden sm:inline">{label}</span>
           </button>
         );
       })}
