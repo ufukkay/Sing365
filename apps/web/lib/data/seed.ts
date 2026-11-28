@@ -173,7 +173,7 @@ export const seedData: DataLayer = {
   async listUsers(tenantId, opts = {}) {
     const q = opts.q?.trim().toLocaleLowerCase("tr-TR");
     const rows = byTenant(tenantId, users).filter(
-      (u) => !q || u.displayName.toLocaleLowerCase("tr-TR").includes(q) || u.email.includes(q),
+      (u) => u.accountEnabled && (!q || u.displayName.toLocaleLowerCase("tr-TR").includes(q) || u.email.includes(q)),
     );
     return rows.slice(0, opts.limit ?? 500);
   },

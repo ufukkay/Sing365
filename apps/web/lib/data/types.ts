@@ -111,6 +111,7 @@ export interface DataLayer {
   /** Makes a new relay key for the tenant, replacing any earlier one, and returns it (shown once). */
   createRelayKey(tenantId: string): Promise<string>;
   /** People by display name; `q` searches name and address. At most `limit` (default 500). */
+  /** Active (enabled) accounts only. */
   listUsers(tenantId: string, opts?: { q?: string; limit?: number }): Promise<DirectoryUser[]>;
   countUsers(tenantId: string): Promise<{ total: number; enabled: number }>;
   /** Name and address of every enabled person (up to 5,000), for pickers. */

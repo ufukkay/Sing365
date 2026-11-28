@@ -118,7 +118,7 @@ export function postgresData(db: Db): DataLayer {
       const q = opts.q?.trim() ? `%${opts.q.trim().replace(/[\\%_]/g, (c) => `\\${c}`)}%` : null;
       const rows = await db.forTenant(tenantId, (tx) =>
         tx.unsafe<UserRow[]>(
-          `select ${USER_SELECT} from directory_users u where u.deleted_at is null
+          `select ${USER_SELECT} from directory_users u where u.deleted_at is null and u.account_enabled
            and ($1::text is null or u.display_name ilike $1 or u.email::text ilike $1)
            order by u.display_name limit $2`,
           [q, limit],

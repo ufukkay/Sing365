@@ -38,9 +38,9 @@ export default async function UsersPage({ searchParams }: { searchParams: Promis
           <p className="text-xs text-text-muted" aria-live="polite">
             {q
               ? `${n(users.length)}${users.length === PAGE ? "+" : ""} sonuç`
-              : users.length < counts.total
-                ? `${n(counts.total)} kişiden ilk ${n(users.length)} kişi`
-                : `${n(counts.total)} kişi`}
+              : users.length < counts.enabled
+                ? `${n(counts.enabled)} kişiden ilk ${n(users.length)} kişi`
+                : `${n(counts.enabled)} kişi`}
           </p>
         </form>
 
