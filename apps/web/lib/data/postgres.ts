@@ -24,6 +24,9 @@ interface UserRow {
   state: string | null;
   postal_code: string | null;
   country: string | null;
+  fax_number: string | null;
+  usage_location: string | null;
+  preferred_language: string | null;
   photo_url: string | null;
   group_ids: string[] | null;
   custom_attrs: Record<string, string>;
@@ -51,6 +54,9 @@ const toUser = (r: UserRow): DirectoryUser => ({
   state: r.state ?? undefined,
   postalCode: r.postal_code ?? undefined,
   country: r.country ?? undefined,
+  faxNumber: r.fax_number ?? undefined,
+  usageLocation: r.usage_location ?? undefined,
+  preferredLanguage: r.preferred_language ?? undefined,
   photoUrl: r.photo_url ?? undefined,
   groupIds: r.group_ids ?? [],
   customAttrs: r.custom_attrs ?? {},
@@ -63,6 +69,7 @@ const toUser = (r: UserRow): DirectoryUser => ({
 const USER_SELECT = `
   u.id, u.email, u.aliases, u.display_name, u.given_name, u.surname, u.job_title, u.department, u.company_name,
   u.office_location, u.business_phone, u.mobile_phone, u.street_address, u.city, u.state, u.postal_code, u.country,
+  u.fax_number, u.usage_location, u.preferred_language,
   null::text as photo_url, u.custom_attrs, u.extension_attrs, u.overrides, u.account_enabled, u.last_synced_at,
   (select array_agg(gm.group_id) from group_members gm where gm.user_id = u.id) as group_ids`;
 
@@ -111,7 +118,7 @@ export function postgresData(db: Db): DataLayer {
       const q = opts.q?.trim() ? `%${opts.q.trim().replace(/[\\%_]/g, (c) => `\\${c}`)}%` : null;
       const rows = await db.forTenant(tenantId, (tx) =>
         tx.unsafe<UserRow[]>(
-          `select ${USER_SELECT} from directory_users u where u.deleted_at is null
+          `select ${USER_SELECT} from directory_users u where u.deleted_at is null and u.account_enabled
            and ($1::text is null or u.display_name ilike $1 or u.email::text ilike $1)
            order by u.display_name limit $2`,
           [q, limit],
@@ -217,6 +224,63 @@ export function postgresData(db: Db): DataLayer {
         update templates set name = ${input.name}, layout = ${tx.json(input.layout as never)}, version = version + 1
         where id = ${templateId} returning id`);
       if (rows.length === 0) throw new Error("template not found");
+    },
+    async updateVisualTemplate(tenantId, templateId, input) {
+      const rows = await db.forTenant(tenantId, (tx) => tx`
+        update templates
+        set name = ${input.name}, layout = ${tx.json(input.layout as never)}, version = version + 1
+        where id = ${templateId} and tenant_id = ${tenantId} and kind = 'signature'
+          and version = ${input.version} and status in ('draft', 'published')
+        returning id`);
+      return rows.length > 0;
+    },
+    async updateTemplateApplication(tenantId, templateId, input) {
+      const { ruleId, priority, senders, recipients, appliesTo, enabled } = input;
+      return db.forTenant(tenantId, async (tx) => {
+        const [updated] = await tx<{ id: string }[]>`
+          update templates
+          set sort_order = ${priority}, version = version + 1
+          where id = ${templateId} and tenant_id = ${tenantId} and kind = 'signature'
+            and version = ${input.version} and status in ('draft', 'published')
+          returning id`;
+        if (!updated) return false;
+        if (ruleId) {
+          const [rule] = await tx<{ id: string }[]>`
+            update rules
+            set senders = ${tx.json(senders as never)}, recipients = ${tx.json(recipients as never)},
+                applies_to = ${appliesTo}, enabled = ${enabled}
+            where id = ${ruleId} and template_id = ${templateId} and tenant_id = ${tenantId}
+            returning id`;
+          if (!rule) throw new Error("signature rule no longer exists");
+        } else {
+          const [rule] = await tx<{ id: string }[]>`
+            insert into rules (tenant_id, template_id, senders, recipients, applies_to, enabled)
+            select ${tenantId}::uuid, ${templateId}::uuid, ${tx.json(senders as never)},
+                   ${tx.json(recipients as never)}, ${appliesTo}::text, ${enabled}::boolean
+            where not exists (select 1 from rules where tenant_id = ${tenantId} and template_id = ${templateId})
+            returning id`;
+          if (!rule) throw new Error("signature rule already exists");
+        }
+        return true;
+      });
+    },
+    async setVisualTemplateStatus(tenantId, templateId, version, status, previous) {
+      const rows = await db.forTenant(tenantId, (tx) => tx`
+        update templates set status = ${status}, version = version + 1
+        where id = ${templateId} and tenant_id = ${tenantId} and kind = 'signature'
+          and version = ${version} and status = ${previous}
+        returning id`);
+      return rows.length > 0;
+    },
+    async deleteArchivedTemplate(tenantId, templateId, version) {
+      const rows = await db.forTenant(tenantId, (tx) => tx`
+        delete from templates t
+        where t.id = ${templateId} and t.tenant_id = ${tenantId} and t.kind = 'signature'
+          and t.version = ${version} and t.status = 'archived'
+          and not exists (select 1 from campaigns where banner_template_id = t.id)
+          and not exists (select 1 from tracked_links where template_id = t.id)
+        returning id`);
+      return rows.length > 0;
     },
   };
 }

@@ -39,9 +39,26 @@ describe("render", () => {
     expect(r.missing).toContain("mobile_phone");
   });
 
-  it("keeps a line when only some placeholders are empty", () => {
+  it("keeps a line when only some placeholders are empty, without a dangling separator", () => {
     const r = render(layout, { ...full, department: "" });
-    expect(r.html).toContain("Account Manager | ");
+    expect(r.html).toContain("Account Manager</span>");
+    expect(r.html).not.toContain("Account Manager | ");
+    expect(r.text).toContain("Account Manager\n");
+    expect(r.missing).toContain("department");
+  });
+
+  it("drops the empty parts of a line with their separators", () => {
+    const line = (text: string, values: Record<string, string>) =>
+      render({ ...layout, elements: [{ type: "text", text }] }, values).text;
+    expect(line("T: {{business_phone}} · M: {{mobile_phone}}", { business_phone: "1", mobile_phone: "" })).toBe("T: 1");
+    expect(line("T: {{business_phone}} · M: {{mobile_phone}}", { business_phone: "", mobile_phone: "2" })).toBe("M: 2");
+    expect(line("{{street_address}}, {{city}} / {{country}}", { street_address: "Kayalar Cd.", city: "", country: "Türkiye" })).toBe("Kayalar Cd. / Türkiye");
+    expect(line("{{given_name}} {{surname}}", { given_name: "Ufuk", surname: "" })).toBe("Ufuk");
+    expect(line("Talay · {{department}}", { department: "BT" })).toBe("Talay · BT");
+    // A line whose fields are all empty is still removed as a whole, literal parts included.
+    expect(line("Talay · {{department}}", { department: "" })).toBe("");
+    // Literal text with commas is left alone.
+    expect(line("Kayalar Caddesi, No:10/1 · {{city}}", { city: "İstanbul" })).toBe("Kayalar Caddesi, No:10/1 · İstanbul");
   });
 
   it("escapes HTML in directory values", () => {
@@ -96,6 +113,35 @@ describe("render", () => {
     const { html } = render(l, { display_name: "Ali" });
     expect(html).not.toContain('width="96"');
     expect(html).toContain("Ali");
+  });
+
+  it("renders up to 5 columns with alignment, vertical alignment and vertical dividers", () => {
+    const l: Layout = {
+      ...layout,
+      elements: [
+        {
+          type: "columns",
+          gap: 12,
+          dividerColor: "#cccccc",
+          columns: [
+            { width: 90, align: "center", valign: "middle", gapAfter: 48, elements: [{ type: "text", text: "S1" }] },
+            { divider: true, align: "left", valign: "top", elements: [{ type: "text", text: "S2", label: "Türkçe Unvan" }] },
+            { align: "right", valign: "bottom", gapAfter: 64, elements: [{ type: "text", text: "S3" }] },
+            { elements: [{ type: "text", text: "S4", align: "center" }] },
+            { elements: [{ type: "text", text: "S5" }] },
+          ],
+        },
+      ],
+    };
+    const { html } = render(l, {});
+    expect(html).toContain("S1");
+    expect(html).toContain("S5");
+    expect(html).toContain('align="center" valign="middle" width="90"');
+    expect(html).toContain("border-left:1px solid #cccccc");
+    expect(html).toContain('width="23" style="width:23px;min-width:23px');
+    expect(html).toContain('width="64" style="width:64px;min-width:64px');
+    expect(html).toContain('align="right" valign="bottom"');
+    expect(html).not.toMatch(/<style|display:\s*flex|<svg|<div/i);
   });
 });
 

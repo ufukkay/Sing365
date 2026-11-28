@@ -35,7 +35,7 @@ export async function POST(req: Request) {
   } | null;
   const key = typeof body?.key === "string" ? body.key : "";
   const tenant = await data.getTenantByRelayKey(key);
-  if (!tenant || tenant.consentStatus !== "granted") return NextResponse.json({ error: "bad_key" }, { status: 403 });
+  if (!tenant) return NextResponse.json({ error: "bad_key" }, { status: 403 });
   if (tenant.domains.length === 0) return NextResponse.json({ error: "no_domains" }, { status: 409 });
 
   const from = typeof body?.from === "string" ? body.from.trim().toLowerCase() : "";
@@ -43,7 +43,9 @@ export async function POST(req: Request) {
   // Mail always goes back to this tenant's own Exchange Online, never to a domain the tenant does not own.
   const returnDomain = tenant.domains.includes(fromDomain) ? fromDomain : tenant.domains[0]!;
 
-  if (body?.skip || !EMAIL.test(from)) return NextResponse.json({ signature: null, returnDomain });
+  // A valid key with consent no longer granted (or a sync problem flagged it): the mail still goes
+  // through, unsigned. Refusing it here would bounce the customer's mail.
+  if (body?.skip || !EMAIL.test(from) || tenant.consentStatus !== "granted") return NextResponse.json({ signature: null, returnDomain });
 
   const recipients = (Array.isArray(body?.recipients) ? body.recipients : [])
     .filter((r): r is string => typeof r === "string")

@@ -38,6 +38,11 @@ export interface DirectoryUser {
   state?: string;
   postalCode?: string;
   country?: string;
+  faxNumber?: string;
+  /** Two-letter country of use, e.g. TR. */
+  usageLocation?: string;
+  /** e.g. tr-TR */
+  preferredLanguage?: string;
   photoUrl?: string;
   groupIds: string[];
   customAttrs: Record<string, string>;
@@ -87,6 +92,17 @@ export interface PersonRef {
   displayName: string;
 }
 
+export interface VisualTemplateUpdate {
+  name: string;
+  layout: Layout;
+  version: number;
+}
+
+export interface TemplateApplicationUpdate extends Pick<Rule, "senders" | "recipients" | "appliesTo" | "priority" | "enabled"> {
+  ruleId?: string;
+  version: number;
+}
+
 export interface DataLayer {
   getTenant(tenantId: string): Promise<Tenant | null>;
   getTenantByEntraId(entraTenantId: string): Promise<Tenant | null>;
@@ -95,6 +111,7 @@ export interface DataLayer {
   /** Makes a new relay key for the tenant, replacing any earlier one, and returns it (shown once). */
   createRelayKey(tenantId: string): Promise<string>;
   /** People by display name; `q` searches name and address. At most `limit` (default 500). */
+  /** Active (enabled) accounts only. */
   listUsers(tenantId: string, opts?: { q?: string; limit?: number }): Promise<DirectoryUser[]>;
   countUsers(tenantId: string): Promise<{ total: number; enabled: number }>;
   /** Name and address of every enabled person (up to 5,000), for pickers. */
@@ -111,4 +128,8 @@ export interface DataLayer {
   createTemplateWithRule(tenantId: string, input: NewTemplate): Promise<string>;
   /** Replaces a template's name and layout and bumps its version (the add-in re-fetches on a new version). */
   updateTemplate(tenantId: string, templateId: string, input: { name: string; layout: Layout }): Promise<void>;
+  updateVisualTemplate(tenantId: string, templateId: string, input: VisualTemplateUpdate): Promise<boolean>;
+  updateTemplateApplication(tenantId: string, templateId: string, input: TemplateApplicationUpdate): Promise<boolean>;
+  setVisualTemplateStatus(tenantId: string, templateId: string, version: number, status: Template["status"], previous: Template["status"]): Promise<boolean>;
+  deleteArchivedTemplate(tenantId: string, templateId: string, version: number): Promise<boolean>;
 }

@@ -1,5 +1,6 @@
 import { after, NextResponse, type NextRequest } from "next/server";
 import { upsertTenantOnConsent } from "@sing365/db";
+import { GraphClient } from "@sing365/graph";
 import { ensureAdmin } from "@/lib/admins";
 import { getDb } from "@/lib/data";
 import { env } from "@/lib/env";
@@ -24,12 +25,31 @@ export async function GET(req: NextRequest) {
   const db = getDb();
   if (!db) return back("no_database");
 
+  // The query string is not proof of consent (anyone can type it): check that Sigwide can
+  // really get an app token for this tenant before marking it as consented.
+  if (!(await appCanSignIn(tid))) return back("consent_not_found");
+
   const tenant = await upsertTenantOnConsent(db, tid, session.email.split("@")[1] ?? "");
-  await ensureAdmin(db, tenant.id, session, { createIfFirst: true });
+  // Only the tenant's first admin is created here; others must be added by an existing admin.
+  const role = await ensureAdmin(db, tenant.id, session, { createIfFirst: true });
+  if (!role) return back("not_admin");
   after(() => runSync(tenant.id, tid).then(() => undefined));
 
   const res = NextResponse.redirect(`${env.publicUrl}/`);
   res.cookies.set(sessionCookie(await signSession({ ...session, tenantId: tenant.id })));
   res.cookies.delete(FLOW_COOKIE);
   return res;
+}
+
+/** True once Entra issues Sigwide an app-only token for the tenant (consent can take a few seconds to apply). */
+async function appCanSignIn(tid: string): Promise<boolean> {
+  for (let attempt = 0; attempt < 4; attempt++) {
+    try {
+      await new GraphClient(tid, { clientId: env.entraClientId, clientSecret: env.entraClientSecret }).accessToken();
+      return true;
+    } catch {
+      await new Promise((r) => setTimeout(r, 2000));
+    }
+  }
+  return false;
 }

@@ -1,10 +1,148 @@
 @import "tailwindcss";
-/* Design tokens are generated in replica/design/tokens.css (source: tokens.json). */
-@import "../../../replica/design/tokens.css";
+
+/* Eye-friendly calm Light & Dark design tokens for Sigwide. */
+:root {
+  color-scheme: light;
+  --s365-color-bg: #f8f9fb;
+  --s365-color-surface: #eef1f5;
+  --s365-color-surface-raised: #ffffff;
+  --s365-color-border: #dde3ea;
+  --s365-color-border-input: #c5ced8;
+  --s365-color-text: #1e293b;
+  --s365-color-text-muted: #5b6778;
+  --s365-color-accent: #0f766e;
+  --s365-color-accent-hover: #0c625c;
+  --s365-color-accent-subtle: #e6f4f2;
+  --s365-color-on-accent: #ffffff;
+  --s365-color-focus: #0f766e;
+  --s365-color-danger: #b83232;
+  --s365-color-danger-subtle: #faeaea;
+  --s365-color-success: #1f6f43;
+  --s365-color-success-subtle: #e7f4ec;
+  --s365-color-warning: #8f5f0a;
+  --s365-color-warning-subtle: #fbf2dd;
+  --s365-color-info: #255ea3;
+  --s365-font-sans: Inter, system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+  --s365-font-mono: "JetBrains Mono", ui-monospace, SFMono-Regular, Menlo, monospace;
+  --s365-radius-sm: 4px;
+  --s365-radius-md: 8px;
+  --s365-radius-lg: 12px;
+  --s365-radius-pill: 999px;
+  --s365-shadow-card: 0 1px 2px rgba(15, 23, 42, 0.04), 0 1px 3px rgba(15, 23, 42, 0.05);
+  --s365-shadow-pop: 0 10px 24px rgba(15, 23, 42, 0.12);
+  --motion-fast: 120ms;
+  --motion-base: 180ms;
+  --ease: cubic-bezier(0.2, 0.8, 0.2, 1);
+}
+
+:root[data-theme="dark"] {
+  color-scheme: dark;
+  --s365-color-bg: #151a21;
+  --s365-color-surface: #1b212b;
+  --s365-color-surface-raised: #222936;
+  --s365-color-border: #313b4b;
+  --s365-color-border-input: #435066;
+  --s365-color-text: #d8e0ea;
+  --s365-color-text-muted: #8f9eb2;
+  --s365-color-accent: #3ba39a;
+  --s365-color-accent-hover: #49b3aa;
+  --s365-color-accent-subtle: #1c3538;
+  --s365-color-on-accent: #071e1c;
+  --s365-color-focus: #3ba39a;
+  --s365-color-danger: #e28585;
+  --s365-color-danger-subtle: #351d20;
+  --s365-color-success: #6ec492;
+  --s365-color-success-subtle: #193124;
+  --s365-color-warning: #dfb25b;
+  --s365-color-warning-subtle: #342914;
+  --s365-color-info: #85aee8;
+  --s365-shadow-card: 0 1px 2px rgba(0, 0, 0, 0.18);
+  --s365-shadow-pop: 0 8px 24px rgba(0, 0, 0, 0.32);
+}
+
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    color-scheme: dark;
+    --s365-color-bg: #151a21;
+    --s365-color-surface: #1b212b;
+    --s365-color-surface-raised: #222936;
+    --s365-color-border: #313b4b;
+    --s365-color-border-input: #435066;
+    --s365-color-text: #d8e0ea;
+    --s365-color-text-muted: #8f9eb2;
+    --s365-color-accent: #3ba39a;
+    --s365-color-accent-hover: #49b3aa;
+    --s365-color-accent-subtle: #1c3538;
+    --s365-color-on-accent: #071e1c;
+    --s365-color-focus: #3ba39a;
+    --s365-color-danger: #e28585;
+    --s365-color-danger-subtle: #351d20;
+    --s365-color-success: #6ec492;
+    --s365-color-success-subtle: #193124;
+    --s365-color-warning: #dfb25b;
+    --s365-color-warning-subtle: #342914;
+    --s365-color-info: #85aee8;
+    --s365-shadow-card: 0 1px 2px rgba(0, 0, 0, 0.18);
+    --s365-shadow-pop: 0 8px 24px rgba(0, 0, 0, 0.32);
+  }
+}
+
+@theme inline {
+  --color-bg: var(--s365-color-bg);
+  --color-surface: var(--s365-color-surface);
+  --color-surface-raised: var(--s365-color-surface-raised);
+  --color-border: var(--s365-color-border);
+  --color-border-input: var(--s365-color-border-input);
+  --color-text: var(--s365-color-text);
+  --color-text-muted: var(--s365-color-text-muted);
+  --color-accent: var(--s365-color-accent);
+  --color-accent-hover: var(--s365-color-accent-hover);
+  --color-accent-subtle: var(--s365-color-accent-subtle);
+  --color-on-accent: var(--s365-color-on-accent);
+  --color-focus: var(--s365-color-focus);
+  --color-danger: var(--s365-color-danger);
+  --color-danger-subtle: var(--s365-color-danger-subtle);
+  --color-success: var(--s365-color-success);
+  --color-success-subtle: var(--s365-color-success-subtle);
+  --color-warning: var(--s365-color-warning);
+  --color-warning-subtle: var(--s365-color-warning-subtle);
+  --color-info: var(--s365-color-info);
+  --font-sans: var(--s365-font-sans);
+  --font-mono: var(--s365-font-mono);
+  --radius-sm: var(--s365-radius-sm);
+  --radius-md: var(--s365-radius-md);
+  --radius-lg: var(--s365-radius-lg);
+  --radius-pill: var(--s365-radius-pill);
+  --shadow-card: var(--s365-shadow-card);
+  --shadow-pop: var(--s365-shadow-pop);
+}
 
 @layer base {
-  html { font-family: var(--s365-font-sans); color: var(--s365-color-text); background: var(--s365-color-bg); }
-  body { font-size: 0.875rem; line-height: 1.25rem; }
-  :focus-visible { outline: 2px solid var(--s365-color-focus); outline-offset: 2px; }
-  @media (prefers-reduced-motion: reduce) { * { transition: none !important; animation: none !important; } }
+  html {
+    font-family: var(--s365-font-sans);
+    color: var(--s365-color-text);
+    background: var(--s365-color-bg);
+  }
+  body {
+    font-size: 0.875rem;
+    line-height: 1.25rem;
+  }
+  select option {
+    background-color: var(--s365-color-surface-raised);
+    color: var(--s365-color-text);
+  }
+  :focus-visible {
+    outline: 2px solid var(--s365-color-focus);
+    outline-offset: 2px;
+  }
+  @media (prefers-reduced-motion: reduce) {
+    * {
+      transition: none !important;
+      animation: none !important;
+    }
+  }
+}
+
+.sigwide-panel-canvas {
+  background: var(--s365-color-surface);
 }

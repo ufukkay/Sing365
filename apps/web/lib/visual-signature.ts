@@ -1,0 +1,332 @@
+import { isSignatureImageUrl, validateLayout, type Align, type Element, type FieldValues, type Layout, type TextStyle, type VAlign } from "@sing365/render";
+import type { Rule } from "@sing365/rules";
+import { publicAssetOrigin } from "./public-origin";
+import { buildQuickLayout, parseQuickConfig } from "./quick-signature";
+
+export const visualFields: { key: string; label: string; group: string }[] = [
+  { key: "display_name", label: "Görünen ad", group: "Kimlik" },
+  { key: "given_name", label: "Ad", group: "Kimlik" },
+  { key: "surname", label: "Soyad", group: "Kimlik" },
+  { key: "job_title", label: "Unvan", group: "Kimlik" },
+  { key: "department", label: "Departman", group: "Kimlik" },
+  { key: "company_name", label: "Şirket", group: "Kimlik" },
+  { key: "email", label: "E-posta", group: "İletişim" },
+  { key: "business_phone", label: "İş telefonu", group: "İletişim" },
+  { key: "mobile_phone", label: "Cep telefonu", group: "İletişim" },
+  { key: "fax_number", label: "Faks", group: "İletişim" },
+  { key: "office_location", label: "Ofis", group: "Konum" },
+  { key: "street_address", label: "Açık adres", group: "Konum" },
+  { key: "city", label: "Şehir", group: "Konum" },
+  { key: "state", label: "İl / eyalet", group: "Konum" },
+  { key: "postal_code", label: "Posta kodu", group: "Konum" },
+  { key: "country", label: "Ülke", group: "Konum" },
+  { key: "usage_location", label: "Ülke kodu (TR, DE…)", group: "Konum" },
+  { key: "preferred_language", label: "Tercih edilen dil (tr-TR…)", group: "Konum" },
+  ...Array.from({ length: 15 }, (_, index) => ({
+    key: `ext.extensionattribute${index + 1}`,
+    label: `Uzantı alanı ${index + 1}`,
+    group: "Özel alanlar",
+  })),
+];
+
+export function hasSignatureContent(layout: Layout): boolean {
+  function hasContent(element: Element): boolean {
+    if (element.type === "text") return Boolean(element.text.trim());
+    if (element.type === "image") return true;
+    if (element.type === "social") return element.links.length > 0;
+    if (element.type === "html") return Boolean(element.html.trim());
+    return element.type === "columns" && element.columns.some((column) => column.elements.some(hasContent));
+  }
+  return Array.isArray(layout.elements) && layout.elements.some(hasContent);
+}
+
+/** Reads friendly custom labels attached to placeholders in a visual layout. */
+export function templateFieldLabels(layout: Layout): Record<string, string> {
+  const labels: Record<string, string> = {};
+  const token = /\{\{\s*([a-z][a-z0-9_.]*)(?:\|(?:upper|lower))?\s*\}\}/i;
+  function walk(elements: Element[]) {
+    for (const element of elements) {
+      if (element.type === "text" && element.label?.trim()) {
+        const match = token.exec(element.text);
+        if (match) labels[match[1]!.toLowerCase()] = element.label.trim();
+      } else if (element.type === "columns") {
+        for (const column of element.columns) walk(column.elements);
+      }
+    }
+  }
+  walk(layout?.elements ?? []);
+  return labels;
+}
+
+export const visualSampleSources: { label: string; values: FieldValues }[] = [
+  {
+    label: "Ayşe Yılmaz · Örnek kişi",
+    values: {
+      display_name: "Ayşe Yılmaz",
+      given_name: "Ayşe",
+      surname: "Yılmaz",
+      job_title: "Operasyon Müdürü",
+      department: "Operasyon",
+      company_name: "Pera Lojistik",
+      office_location: "İstanbul Merkez Ofisi",
+      email: "ayse.yilmaz@pera.example",
+      business_phone: "+90 212 000 00 01",
+      mobile_phone: "+90 500 000 00 01",
+      street_address: "Örnek Mahallesi, Kuzey Sokak No. 8",
+      city: "İstanbul",
+      state: "İstanbul",
+      postal_code: "34000",
+      country: "Türkiye",
+      fax_number: "+90 212 000 00 99",
+      usage_location: "TR",
+      preferred_language: "tr-TR",
+      "ext.extensionattribute1": "Operasyon Müdürü",
+    },
+  },
+  {
+    label: "Mert Akın · Eksik alanları göster",
+    values: {
+      display_name: "Mert Akın",
+      given_name: "Mert",
+      surname: "Akın",
+      email: "mert.akin@pera.example",
+      company_name: "Pera Lojistik",
+    },
+  },
+];
+
+type VisualLayoutResult = { layout: Layout; errors: [] } | { layout: null; errors: string[] };
+
+function record(value: unknown, message: string): Record<string, unknown> {
+  if (typeof value !== "object" || value === null || Array.isArray(value)) throw new Error(message);
+  return value as Record<string, unknown>;
+}
+
+function readText(value: unknown, max: number, field: string): string {
+  if (typeof value !== "string" || value.length > max) {
+    throw new Error(`${field} metni en fazla ${max} karakter olabilir.`);
+  }
+  return value;
+}
+
+function integer(value: unknown, min: number, max: number, field: string): number {
+  if (typeof value !== "number" || !Number.isInteger(value) || value < min || value > max) {
+    throw new Error(`${field} ${min} ile ${max} arasında bir tam sayı olmalı.`);
+  }
+  return value;
+}
+
+function boolean(value: unknown, field: string): boolean {
+  if (typeof value !== "boolean") throw new Error(`${field} açık veya kapalı olmalı.`);
+  return value;
+}
+
+function color(value: unknown): string {
+  if (typeof value !== "string" || !/^#[\da-f]{6}$/i.test(value)) throw new Error("Geçerli bir renk seçin.");
+  return value;
+}
+
+function fontStack(value: unknown): string {
+  const message = "Geçerli bir yazı tipi seçin.";
+  if (typeof value !== "string" || value.length > 150) throw new Error(message);
+  const fonts = value.split(",").map((font) => font.trim().replace(/^(['"])(.+)\1$/, "$2"));
+  if (fonts.length > 5 || fonts.some((font) => !/^[a-z][a-z\d -]{0,29}$/i.test(font))) throw new Error(message);
+  return fonts.join(", ");
+}
+
+function webUrl(value: string): boolean {
+  if (!/^https?:\/\//i.test(value) || /[\s\\{}\u0000-\u001f\u007f]/u.test(value)) return false;
+  try {
+    const url = new URL(value);
+    return Boolean(url.hostname && !url.username && !url.password);
+  } catch {
+    return false;
+  }
+}
+
+function readUrl(value: unknown, mode: "image" | "link"): string {
+  const isImage = mode === "image";
+  const label = isImage ? "Görsel adresi" : "Bağlantı adresi";
+  const url = readText(value, 2_048, label).trim();
+  if (webUrl(url) && (!isImage || isSignatureImageUrl(url))) return url;
+  if (isImage) throw new Error("Görsel yükleyin veya geçerli bir HTTPS adresi girin.");
+  if (/^mailto:\{\{\s*email\s*\}\}$/i.test(url)) return "mailto:{{email}}";
+  const phoneField = /^tel:\{\{\s*(business_phone|mobile_phone)\s*\}\}$/i.exec(url);
+  if (phoneField) return `tel:{{${phoneField[1]!.toLowerCase()}}}`;
+  if (/^mailto:[^\s<>@\u0000-\u001f\u007f{}]+@[^\s<>@?\u0000-\u001f\u007f{}]+(?:\?[^\s<>\u0000-\u001f\u007f{}]*)?$/iu.test(url)) return url;
+  if (/^tel:\+?[\d ().-]+(?:;ext=\d+)?$/iu.test(url) && /\d/.test(url)) return url.replaceAll(" ", "");
+  throw new Error("Geçerli bir web, e-posta veya telefon bağlantısı girin.");
+}
+
+function readHref(value: unknown): string | undefined {
+  return value === undefined || value === "" ? undefined : readUrl(value, "link");
+}
+
+function readStyle(value: unknown): TextStyle | undefined {
+  if (value === undefined) return undefined;
+  const style = record(value, "Metin biçimi geçersiz.");
+  return {
+    size: style.size === undefined ? undefined : integer(style.size, 11, 20, "Yazı boyutu"),
+    bold: style.bold === undefined ? undefined : boolean(style.bold, "Kalın yazı"),
+    italic: style.italic === undefined ? undefined : boolean(style.italic, "İtalik yazı"),
+    color: style.color === undefined ? undefined : color(style.color),
+  };
+}
+
+function readAlign(value: unknown): Align | undefined {
+  if (value === undefined) return undefined;
+  if (value === "left" || value === "center" || value === "right") return value;
+  throw new Error("Geçerli bir yatay hizalama seçin.");
+}
+
+function readVAlign(value: unknown): VAlign | undefined {
+  if (value === undefined) return undefined;
+  if (value === "top" || value === "middle" || value === "bottom") return value;
+  throw new Error("Geçerli bir dikey hizalama seçin.");
+}
+
+function readLabel(value: unknown): string | undefined {
+  if (value === undefined || value === "") return undefined;
+  const label = readText(value, 60, "Alan adı").trim();
+  return label || undefined;
+}
+
+function readElements(value: unknown, maxWidth: number, allowColumns: boolean, count: { total: number }): Element[] {
+  if (!Array.isArray(value)) throw new Error("İmza blokları okunamadı.");
+  count.total += value.length;
+  if (count.total > 100) throw new Error("Bir imzada en fazla 100 blok kullanabilirsiniz.");
+  return value.map((item): Element => {
+    const element = record(item, "İmza bloğu geçersiz.");
+    switch (element.type) {
+      case "text":
+        return {
+          type: "text",
+          text: readText(element.text, 2_000, "İmza"),
+          label: readLabel(element.label),
+          style: readStyle(element.style),
+          href: readHref(element.href),
+          align: readAlign(element.align),
+        };
+      case "image": {
+        const alt = readText(element.alt, 160, "Görsel açıklaması").trim();
+        if (!alt || /\{\{|\}\}/.test(alt)) throw new Error("Görsel için kısa ve sabit bir açıklama girin.");
+        return {
+          type: "image",
+          src: readUrl(element.src, "image"),
+          alt,
+          width: integer(element.width, 1, maxWidth, "Görsel genişliği"),
+          height: integer(element.height, 1, 600, "Görsel yüksekliği"),
+          href: readHref(element.href),
+          align: readAlign(element.align),
+        };
+      }
+      case "divider":
+        return { type: "divider", color: element.color === undefined ? undefined : color(element.color) };
+      case "spacer":
+        return { type: "spacer", height: integer(element.height, 1, 48, "Boşluk yüksekliği") };
+      case "social": {
+        if (!Array.isArray(element.links) || element.links.length > 8) throw new Error("Bir blokta en fazla sekiz sosyal bağlantı kullanabilirsiniz.");
+        return {
+          type: "social",
+          size: element.size === undefined ? undefined : integer(element.size, 12, 32, "Simge boyutu"),
+          links: element.links.map((item: unknown) => {
+            const link = record(item, "Sosyal bağlantı geçersiz.");
+            const label = readText(link.label, 60, "Bağlantı etiketi").trim();
+            if (!label) throw new Error("Sosyal bağlantıya bir etiket verin.");
+            return {
+              network: readText(link.network, 40, "Sosyal ağ").trim(),
+              label,
+              url: readUrl(link.url, "link"),
+              icon: readUrl(link.icon, "image"),
+            };
+          }),
+        };
+      }
+      case "columns": {
+        if (!allowColumns) throw new Error("Sütunların içine ikinci bir sütun bloğu eklenemez.");
+        if (!Array.isArray(element.columns) || element.columns.length < 2 || element.columns.length > 5) {
+          throw new Error("Bir satırda 2 ile 5 arasında sütun kullanabilirsiniz.");
+        }
+        return {
+          type: "columns",
+          gap: element.gap === undefined ? undefined : integer(element.gap, 0, 160, "Sütun aralığı"),
+          dividerColor: element.dividerColor === undefined ? undefined : color(element.dividerColor),
+          spread: element.spread === undefined ? undefined : boolean(element.spread, "Sütunları yay"),
+          columns: element.columns.map((item: unknown) => {
+            const column = record(item, "Sütun geçersiz.");
+            const width = column.width === undefined ? undefined : integer(column.width, 1, maxWidth, "Sütun genişliği");
+            return {
+              width,
+              align: readAlign(column.align),
+              valign: readVAlign(column.valign),
+              divider: column.divider === undefined ? undefined : boolean(column.divider, "Dikey ayırıcı"),
+              gapAfter: column.gapAfter === undefined ? undefined : integer(column.gapAfter, 0, 160, "Sütun sonrası boşluk"),
+              elements: readElements(column.elements, width ?? maxWidth, false, count),
+            };
+          }),
+        };
+      }
+      default:
+        throw new Error("Bu blok görsel düzenleyicide kullanılamaz.");
+    }
+  });
+}
+
+/** Parses the visual editor payload before it can be stored or rendered. */
+export function parseVisualLayout(input: unknown): VisualLayoutResult {
+  try {
+    let source = record(input, "İmza düzeni okunamadı.");
+    // A quick-editor signature: the blocks are always rebuilt here from its validated choices.
+    let builder: Layout["builder"];
+    let extras: Pick<Layout, "reply" | "externalOnly"> = {};
+    if (source.builder !== undefined) {
+      const b = record(source.builder, "İmza düzenleyici bilgisi okunamadı.");
+      if (b.kind !== "quick") throw new Error("İmza düzenleyici türü desteklenmiyor.");
+      const quick = buildQuickLayout(parseQuickConfig(b.config, isSignatureImageUrl), publicAssetOrigin());
+      builder = quick.builder;
+      // Built here from validated choices, like the main blocks.
+      extras = { ...(quick.reply ? { reply: quick.reply } : {}), ...(quick.externalOnly ? { externalOnly: quick.externalOnly } : {}) };
+      source = quick as unknown as Record<string, unknown>;
+    }
+    if (source.version !== 1) throw new Error("İmza düzeninin sürümü desteklenmiyor.");
+    const colors = record(source.colors, "İmza renkleri okunamadı.");
+    const maxWidth = source.maxWidth === undefined ? 800 : integer(source.maxWidth, 160, 800, "İmza genişliği");
+    const layout: Layout = {
+      version: 1,
+      fontStack: fontStack(source.fontStack),
+      baseSize: source.baseSize === undefined ? undefined : integer(source.baseSize, 11, 20, "Temel yazı boyutu"),
+      colors: {
+        text: color(colors.text),
+        link: color(colors.link),
+        muted: colors.muted === undefined ? undefined : color(colors.muted),
+        divider: colors.divider === undefined ? undefined : color(colors.divider),
+      },
+      maxWidth,
+      elements: readElements(source.elements, maxWidth, true, { total: 0 }),
+      ...extras,
+      ...(builder ? { builder } : {}),
+    };
+    const errors = validateLayout(layout).map((error) => {
+      const field = /^Unknown field \{\{(.+)\}\}\.$/.exec(error);
+      return field ? `“${field[1]}” kullanılabilir Entra alanlarından biri değil.` : error;
+    });
+    return errors.length > 0 ? { layout: null, errors } : { layout, errors: [] };
+  } catch (error) {
+    return { layout: null, errors: [error instanceof Error ? error.message : "İmza düzeni okunamadı."] };
+  }
+}
+
+/** Only rules the visual editor can round-trip without discarding targeting data. */
+export function simpleVisualRule(rules: Rule[]): Rule | undefined {
+  const [rule] = rules;
+  if (rules.length !== 1 || !rule) return undefined;
+  if (rule.activeFrom != null || rule.activeUntil != null || Object.keys(rule.exceptions ?? {}).length > 0) return undefined;
+  if (rule.recipients.domains?.length || Object.keys(rule.recipients).some((key) => key !== "scope" && key !== "domains")) return undefined;
+
+  const { senders } = rule;
+  if (Object.keys(senders).some((key) => key !== "all" && key !== "groups")) return undefined;
+  const groups = senders.groups ?? [];
+  if (senders.all === true && groups.length === 0) return rule;
+  if (senders.all !== true && groups.length === 1 && groups[0]) return rule;
+  return undefined;
+}

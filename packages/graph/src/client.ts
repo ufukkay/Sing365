@@ -17,14 +17,26 @@ export class GraphError extends Error {
     message: string,
     readonly status: number,
     readonly code?: string,
+    /** AADSTS error numbers from the token endpoint, e.g. 7000215 for a wrong client secret. */
+    readonly aadCodes: number[] = [],
   ) {
     super(message);
   }
+  /**
+   * Sigwide's own client secret is wrong or expired (AADSTS7000215, 7000222). This is our
+   * configuration problem, not the customer's: it must never mark their consent as revoked.
+   */
+  get isCredentialProblem(): boolean {
+    return this.aadCodes.some((c) => CREDENTIAL_ERRORS.has(c));
+  }
   /** Consent removed, app deleted in the tenant, or permissions missing. */
   get isConsentProblem(): boolean {
+    if (this.isCredentialProblem) return false;
     return this.status === 401 || this.status === 403 || this.code === "invalid_client" || this.code === "unauthorized_client";
   }
 }
+
+const CREDENTIAL_ERRORS = new Set([7000215, 7000222]);
 
 const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));
 
@@ -53,7 +65,8 @@ export class GraphClient {
     });
     const body = (await res.json().catch(() => ({}))) as Record<string, unknown>;
     if (!res.ok || typeof body.access_token !== "string") {
-      throw new GraphError(`token request failed: ${String(body.error_description ?? res.status)}`, res.status, String(body.error ?? ""));
+      const aadCodes = Array.isArray(body.error_codes) ? body.error_codes.filter((c): c is number => typeof c === "number") : [];
+      throw new GraphError(`token request failed: ${String(body.error_description ?? res.status)}`, res.status, String(body.error ?? ""), aadCodes);
     }
     this.token = { value: body.access_token, expiresAt: Date.now() + Number(body.expires_in ?? 3600) * 1000 };
     return this.token.value;

@@ -1,34 +1,52 @@
 import Link from "next/link";
-import { FieldHelp } from "@/components/field-help";
-import { HtmlTemplateForm } from "@/components/html-template-form";
-import { Card, PageHeader } from "@/components/ui";
+import { QuickSignatureEditor } from "@/components/quick-signature-editor";
+import { publicAssetOrigin } from "@/lib/public-origin";
+import { QUICK_TEMPLATES } from "@/lib/quick-signature";
+import { SignatureDesigner } from "@/components/signature-designer";
+import { PageHeader } from "@/components/ui";
 import { requirePanel } from "@/lib/context";
 import { data } from "@/lib/data";
 import { fieldValues } from "@/lib/signature";
-import { saveHtmlTemplateAction } from "../actions";
+import { visualFields, visualSampleSources } from "@/lib/visual-signature";
+import { previewPeopleAction, previewVisualTemplateAction, saveVisualTemplateAction } from "../actions";
 
-export const metadata = { title: "HTML'den imza" };
+export const metadata = { title: "Yeni imza" };
 
-export default async function NewHtmlSignature() {
+export default async function NewSignature({ searchParams }: { searchParams: Promise<{ template?: string }> }) {
+  // A ready-made template (chosen on the signatures page) opens the quick editor; otherwise the full designer.
+  const wanted = (await searchParams).template;
+  const template = QUICK_TEMPLATES.find((t) => t.id === wanted);
+  const advanced = !template;
   const { tenantId, session } = await requirePanel();
-  const me = session ? await data.findUserByEmail(tenantId, session.email) : null;
+  const [me, templates] = await Promise.all([
+    session ? data.findUserByEmail(tenantId, session.email) : Promise.resolve(null),
+    data.listTemplates(tenantId),
+  ]);
+  const existingNames = templates.filter((t) => t.kind === "signature").map((t) => t.name);
+  const sources = me ? [{ label: `Dizin · ${me.displayName}`, values: fieldValues(me) }, ...visualSampleSources] : visualSampleSources;
+
   return (
     <>
       <PageHeader
-        title="HTML'den imza oluştur"
-        description="Kullandığınız imza HTML'ini yapıştırın; kişiye göre değişen yerlere alan yazın. Herkese, dizindeki kendi bilgileriyle uygulanır."
+        title="Yeni imza"
         actions={
-          <Link href="/signatures" className="text-sm font-medium text-accent underline">
-            Tüm imzalar
-          </Link>
+          <div className="flex items-center gap-4">
+            {advanced && <Link href="/signatures#sablonlar" className="text-sm font-medium text-accent underline-offset-4 hover:underline">Hazır şablonla başla</Link>}
+            <Link href="/signatures" className="text-sm font-medium text-accent underline-offset-4 hover:underline">Tüm imzalar</Link>
+          </div>
         }
       />
-      <div className="grid gap-6 lg:grid-cols-[1fr_360px]">
-        <Card>
-          <HtmlTemplateForm action={saveHtmlTemplateAction} />
-        </Card>
-        <FieldHelp values={me ? fieldValues(me) : null} />
-      </div>
+      {advanced ? (
+        <SignatureDesigner
+          action={saveVisualTemplateAction} preview={previewVisualTemplateAction}
+          sources={sources} fields={visualFields} existingNames={existingNames}
+        />
+      ) : (
+        <QuickSignatureEditor
+          action={saveVisualTemplateAction} preview={previewVisualTemplateAction}
+          sources={sources} artOrigin={publicAssetOrigin()} findPeople={previewPeopleAction} advancedHref="/signatures/new" startTemplate={template?.id}
+        />
+      )}
     </>
   );
 }

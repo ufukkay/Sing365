@@ -1,5 +1,5 @@
-import { render, type FieldValues } from "@sing365/render";
-import { resolve, type Mode, type TraceEntry } from "@sing365/rules";
+import { layoutForMessage, render, type FieldValues } from "@sing365/render";
+import { domainOf, resolve, type Mode, type TraceEntry } from "@sing365/rules";
 import type { DataLayer, DirectoryUser } from "./data/types";
 
 /** Directory values for placeholders. Overrides (self-service, admin edits) win over synced values. */
@@ -20,6 +20,9 @@ export function fieldValues(u: DirectoryUser): FieldValues {
     state: u.state,
     postal_code: u.postalCode,
     country: u.country,
+    fax_number: u.faxNumber,
+    usage_location: u.usageLocation,
+    preferred_language: u.preferredLanguage,
     photo_url: u.photoUrl,
   };
   for (const [k, v] of Object.entries(u.extAttrs ?? {})) base[`ext.${k.toLowerCase()}`] = v;
@@ -75,6 +78,8 @@ export async function buildSignature(db: DataLayer, req: SignatureRequest): Prom
   );
   if (!res.templateId) return { ok: true, templateId: null, version: null, html: "", text: "", missing: [], trace: res.trace };
   const template = templates.find((t) => t.id === res.templateId)!;
-  const out = render(template.layout, fieldValues(user));
+  const internal = new Set(tenant.domains.map((d) => d.toLowerCase()));
+  const external = req.recipients.length === 0 || req.recipients.some((r) => !internal.has(domainOf(r)));
+  const out = render(layoutForMessage(template.layout, { reply: req.mode === "reply", external }), fieldValues(user));
   return { ok: true, templateId: template.id, version: template.version, html: out.html, text: out.text, missing: out.missing, trace: res.trace };
 }

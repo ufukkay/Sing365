@@ -1,24 +1,24 @@
-/* Generated from replica/design/tokens.json. Edit the JSON, then regenerate. */
+/* Eye-friendly calm Light & Dark design tokens for Sigwide. */
 :root {
-  --s365-color-bg: #ffffff;
-  --s365-color-surface: #f5f7f8;
-  --s365-color-surface-raised: #ffffff;
-  --s365-color-border: #e2e6e9;
-  --s365-color-border-input: #7d8790;
-  --s365-color-text: #121a21;
-  --s365-color-text-muted: #55606b;
-  --s365-color-accent: #0b6e69;
-  --s365-color-accent-hover: #085954;
-  --s365-color-accent-subtle: #e3f2f1;
+  --s365-color-bg: #f8f9fa;
+  --s365-color-surface: #f1f4f7;
+  --s365-color-surface-raised: #fcfcfd;
+  --s365-color-border: #e2e7ec;
+  --s365-color-border-input: #cbd3dc;
+  --s365-color-text: #1e293b;
+  --s365-color-text-muted: #5f6d7e;
+  --s365-color-accent: #0f766e;
+  --s365-color-accent-hover: #0d635d;
+  --s365-color-accent-subtle: #e6f4f2;
   --s365-color-on-accent: #ffffff;
-  --s365-color-focus: #0b6e69;
-  --s365-color-danger: #b42323;
-  --s365-color-danger-subtle: #fbeaea;
-  --s365-color-success: #1d6b3f;
-  --s365-color-success-subtle: #e6f3ea;
-  --s365-color-warning: #8a5a00;
-  --s365-color-warning-subtle: #fdf3dc;
-  --s365-color-info: #1f5aa6;
+  --s365-color-focus: #0f766e;
+  --s365-color-danger: #b83232;
+  --s365-color-danger-subtle: #faeaea;
+  --s365-color-success: #1f6f43;
+  --s365-color-success-subtle: #e7f4ec;
+  --s365-color-warning: #8f5f0a;
+  --s365-color-warning-subtle: #fbf2dd;
+  --s365-color-info: #255ea3;
   --s365-font-sans: Inter, system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
   --s365-font-mono: "JetBrains Mono", ui-monospace, SFMono-Regular, Menlo, monospace;
   --text-xs: 0.75rem;
@@ -44,12 +44,12 @@
   --s365-radius-md: 8px;
   --s365-radius-lg: 12px;
   --s365-radius-pill: 999px;
-  --s365-shadow-card: 0 1px 2px rgba(18,26,33,.06), 0 1px 3px rgba(18,26,33,.08);
-  --s365-shadow-pop: 0 10px 28px rgba(18,26,33,.16);
+  --s365-shadow-card: 0 1px 2px rgba(15, 23, 42, 0.04), 0 1px 3px rgba(15, 23, 42, 0.05);
+  --s365-shadow-pop: 0 10px 24px rgba(15, 23, 42, 0.12);
   --motion-fast: 120ms;
   --motion-base: 180ms;
-  --ease: cubic-bezier(.2,.8,.2,1);
-  --layout-sidebar: 248px;
+  --ease: cubic-bezier(0.2, 0.8, 0.2, 1);
+  --layout-sidebar: 236px;
   --layout-sidebar-collapsed: 64px;
   --layout-header: 56px;
   --layout-content-max: 1200px;
@@ -58,48 +58,48 @@
 }
 
 :root[data-theme="dark"] {
-  --s365-color-bg: #0f1418;
-  --s365-color-surface: #161d22;
-  --s365-color-border: #2a343c;
-  --s365-color-border-input: #7a8792;
-  --s365-color-text: #e9eef2;
-  --s365-color-text-muted: #a3afb9;
-  --s365-color-accent: #4fc2b9;
-  --s365-color-on-accent: #06201e;
-  --s365-color-danger: #f08a8a;
-  --s365-color-success: #7fd1a0;
-  --s365-color-surface-raised: #1b2329;
-  --s365-color-accent-hover: #6fd3cb;
-  --s365-color-accent-subtle: #123532;
-  --s365-color-focus: #4fc2b9;
-  --s365-color-danger-subtle: #3a1a1c;
-  --s365-color-success-subtle: #15301f;
-  --s365-color-warning: #e8b85a;
-  --s365-color-warning-subtle: #3a2c10;
-  --s365-color-info: #8ab4f0;
+  --s365-color-bg: #161b22;
+  --s365-color-surface: #1b212a;
+  --s365-color-surface-raised: #212833;
+  --s365-color-border: #2e3745;
+  --s365-color-border-input: #404c5d;
+  --s365-color-text: #d7dfe8;
+  --s365-color-text-muted: #91a0b2;
+  --s365-color-accent: #3da89f;
+  --s365-color-accent-hover: #4db7ae;
+  --s365-color-accent-subtle: #193435;
+  --s365-color-on-accent: #071e1c;
+  --s365-color-focus: #3da89f;
+  --s365-color-danger: #e28585;
+  --s365-color-danger-subtle: #351d20;
+  --s365-color-success: #6ec492;
+  --s365-color-success-subtle: #193124;
+  --s365-color-warning: #dfb25b;
+  --s365-color-warning-subtle: #342914;
+  --s365-color-info: #85aee8;
 }
 
 @media (prefers-color-scheme: dark) {
   :root:not([data-theme="light"]) {
-    --s365-color-bg: #0f1418;
-    --s365-color-surface: #161d22;
-    --s365-color-border: #2a343c;
-    --s365-color-border-input: #7a8792;
-    --s365-color-text: #e9eef2;
-    --s365-color-text-muted: #a3afb9;
-    --s365-color-accent: #4fc2b9;
-    --s365-color-on-accent: #06201e;
-    --s365-color-danger: #f08a8a;
-    --s365-color-success: #7fd1a0;
-    --s365-color-surface-raised: #1b2329;
-    --s365-color-accent-hover: #6fd3cb;
-    --s365-color-accent-subtle: #123532;
-    --s365-color-focus: #4fc2b9;
-    --s365-color-danger-subtle: #3a1a1c;
-    --s365-color-success-subtle: #15301f;
-    --s365-color-warning: #e8b85a;
-    --s365-color-warning-subtle: #3a2c10;
-    --s365-color-info: #8ab4f0;
+    --s365-color-bg: #161b22;
+    --s365-color-surface: #1b212a;
+    --s365-color-surface-raised: #212833;
+    --s365-color-border: #2e3745;
+    --s365-color-border-input: #404c5d;
+    --s365-color-text: #d7dfe8;
+    --s365-color-text-muted: #91a0b2;
+    --s365-color-accent: #3da89f;
+    --s365-color-accent-hover: #4db7ae;
+    --s365-color-accent-subtle: #193435;
+    --s365-color-on-accent: #071e1c;
+    --s365-color-focus: #3da89f;
+    --s365-color-danger: #e28585;
+    --s365-color-danger-subtle: #351d20;
+    --s365-color-success: #6ec492;
+    --s365-color-success-subtle: #193124;
+    --s365-color-warning: #dfb25b;
+    --s365-color-warning-subtle: #342914;
+    --s365-color-info: #85aee8;
   }
 }
 

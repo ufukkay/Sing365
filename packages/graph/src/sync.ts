@@ -14,19 +14,50 @@ import {
 } from "@sing365/db";
 import { GraphClient, GraphError } from "./client";
 
-const USER_FIELDS = [
-  "id", "mail", "userPrincipalName", "proxyAddresses", "displayName", "givenName", "surname", "jobTitle",
-  "department", "companyName", "officeLocation", "businessPhones", "mobilePhone", "streetAddress", "city",
-  "state", "postalCode", "country", "accountEnabled", "userType", "onPremisesExtensionAttributes", "assignedLicenses",
+const REQUIRED_USER_PROPERTIES = [
+  "id", "mail", "proxyAddresses", "displayName", "jobTitle", "department", "accountEnabled", "userType",
 ];
+const OPTIONAL_USER_PROPERTIES = {
+  given_name: "givenName",
+  surname: "surname",
+  company_name: "companyName",
+  office_location: "officeLocation",
+  business_phone: "businessPhones",
+  mobile_phone: "mobilePhone",
+  street_address: "streetAddress",
+  city: "city",
+  state: "state",
+  postal_code: "postalCode",
+  country: "country",
+  fax_number: "faxNumber",
+  usage_location: "usageLocation",
+  preferred_language: "preferredLanguage",
+};
+const GROUP_SELECTION = "id,displayName,members";
 
-export const USERS_DELTA_START = `/users/delta?$select=${USER_FIELDS.join(",")}`;
-export const GROUPS_DELTA_START = `/groups/delta?$select=id,displayName,mail,members`;
+function usersDeltaStart(properties: readonly string[]): string {
+  return `/users/delta?$select=${properties.join(",")}`;
+}
+
+function userProjection(fields: ReadonlySet<string> = new Set()) {
+  const properties = [...REQUIRED_USER_PROPERTIES];
+  for (const [field, property] of Object.entries(OPTIONAL_USER_PROPERTIES)) {
+    if (fields.has(field)) properties.push(property);
+  }
+  const extensionKeys = [...fields]
+    .filter((field) => /^ext\.extensionattribute(?:[1-9]|1[0-5])$/.test(field))
+    .map((field) => field.slice(4))
+    .sort();
+  if (extensionKeys.length) properties.push("onPremisesExtensionAttributes");
+  return { properties, extensionKeys };
+}
+
+export const USERS_DELTA_START = usersDeltaStart(REQUIRED_USER_PROPERTIES);
+export const GROUPS_DELTA_START = `/groups/delta?$select=${GROUP_SELECTION}`;
 
 export interface GraphUser {
   id: string;
   mail?: string | null;
-  userPrincipalName?: string | null;
   proxyAddresses?: string[];
   displayName?: string | null;
   givenName?: string | null;
@@ -42,17 +73,18 @@ export interface GraphUser {
   state?: string | null;
   postalCode?: string | null;
   country?: string | null;
+  faxNumber?: string | null;
+  usageLocation?: string | null;
+  preferredLanguage?: string | null;
   accountEnabled?: boolean | null;
   userType?: string | null;
   onPremisesExtensionAttributes?: Record<string, string | null> | null;
-  assignedLicenses?: unknown[];
   "@removed"?: { reason: string };
 }
 
 export interface GraphGroup {
   id: string;
   displayName?: string | null;
-  mail?: string | null;
   "members@delta"?: { "@odata.type"?: string; id: string; "@removed"?: unknown }[];
   "@removed"?: { reason: string };
 }
@@ -63,7 +95,7 @@ const clean = (s: string | null | undefined) => {
 };
 
 /** Graph user -> directory row. Users without a mailbox address are skipped (return null). */
-export function mapUser(u: GraphUser): DirectoryUserInput | null {
+export function mapUser(u: GraphUser, extensionKeys?: readonly string[]): DirectoryUserInput | null {
   const email = clean(u.mail);
   if (!email) return null;
   if (u.userType && u.userType.toLowerCase() === "guest") return null;
@@ -72,7 +104,9 @@ export function mapUser(u: GraphUser): DirectoryUserInput | null {
     .map((p) => p.slice(5).toLowerCase())
     .filter((a) => a !== email.toLowerCase());
   const ext: Record<string, string> = {};
-  for (const [k, v] of Object.entries(u.onPremisesExtensionAttributes ?? {})) if (v) ext[k] = v;
+  for (const [key, value] of Object.entries(u.onPremisesExtensionAttributes ?? {})) {
+    if (value && (!extensionKeys || extensionKeys.includes(key.toLowerCase()))) ext[key] = value;
+  }
   return {
     entraObjectId: u.id,
     email,
@@ -91,6 +125,9 @@ export function mapUser(u: GraphUser): DirectoryUserInput | null {
     state: clean(u.state),
     postalCode: clean(u.postalCode),
     country: clean(u.country),
+    faxNumber: clean(u.faxNumber),
+    usageLocation: clean(u.usageLocation),
+    preferredLanguage: clean(u.preferredLanguage),
     managerEntraId: null,
     extensionAttrs: ext,
     accountEnabled: u.accountEnabled !== false,
@@ -107,6 +144,11 @@ export interface SyncResult {
   error?: string;
 }
 
+export interface DirectorySyncOptions {
+  forceFull?: boolean;
+  fields?: ReadonlySet<string>;
+}
+
 /**
  * Syncs one tenant's users and groups from Graph into Postgres.
  * Uses the last successful delta links, so after the first full run only changes are fetched.
@@ -116,10 +158,15 @@ export async function syncTenant(
   db: Db,
   graph: GraphClient,
   tenantId: string,
-  opts: { forceFull?: boolean } = {},
+  opts: DirectorySyncOptions = {},
 ): Promise<SyncResult> {
-  const links = opts.forceFull ? { users: null, groups: null } : await db.forTenant(tenantId, (tx) => lastDeltaLinks(tx, tenantId));
-  const kind = links.users && links.groups ? "delta" : "full";
+  const projection = userProjection(opts.fields);
+  const usersSelection = JSON.stringify(projection);
+  const links = opts.forceFull ? null : await db.forTenant(tenantId, (tx) => lastDeltaLinks(tx, tenantId));
+  // Graph's delta URL encodes the original $select. Reuse it only for the exact same scope.
+  const userLink = links?.usersSelection === usersSelection ? links.users : null;
+  const groupLink = links?.groupsSelection === GROUP_SELECTION ? links.groups : null;
+  const kind = userLink && groupLink ? "delta" : "full";
   const runId = await db.forTenant(tenantId, (tx) => startSyncRun(tx, tenantId, kind));
   let usersChanged = 0;
   let usersRemoved = 0;
@@ -127,13 +174,21 @@ export async function syncTenant(
 
   try {
     let usersDeltaLink = "";
-    for await (const page of graph.pages<GraphUser>(links.users ?? USERS_DELTA_START)) {
-      const removed = page.value.filter((u) => u["@removed"]).map((u) => u.id);
-      const mapped = page.value.filter((u) => !u["@removed"]).map(mapUser);
-      const skipped = page.value.filter((u, i) => !u["@removed"] && mapped[i] === null).map((u) => u.id);
-      const rows = mapped.filter((u): u is DirectoryUserInput => u !== null);
+    for await (const page of graph.pages<GraphUser>(userLink ?? usersDeltaStart(projection.properties))) {
+      const removed: string[] = [];
+      const skipped: string[] = [];
+      const rows: DirectoryUserInput[] = [];
+      for (const user of page.value) {
+        if (user["@removed"]) {
+          removed.push(user.id);
+          continue;
+        }
+        const row = mapUser(user, projection.extensionKeys);
+        if (row) rows.push(row);
+        else skipped.push(user.id);
+      }
       await db.forTenant(tenantId, async (tx) => {
-        usersChanged += await upsertUsers(tx, tenantId, rows);
+        usersChanged += await upsertUsers(tx, tenantId, rows, projection);
         // A user who lost their mailbox (or became a guest) stops being a signature sender.
         await softDeleteUsers(tx, tenantId, [...removed, ...skipped]);
       });
@@ -142,13 +197,13 @@ export async function syncTenant(
     }
 
     let groupsDeltaLink = "";
-    for await (const page of graph.pages<GraphGroup>(links.groups ?? GROUPS_DELTA_START)) {
+    for await (const page of graph.pages<GraphGroup>(groupLink ?? GROUPS_DELTA_START)) {
       await db.forTenant(tenantId, async (tx) => {
         const live = page.value.filter((g) => !g["@removed"]);
         await upsertGroups(
           tx,
           tenantId,
-          live.filter((g) => g.displayName).map((g) => ({ entraObjectId: g.id, displayName: g.displayName!, mail: clean(g.mail) })),
+          live.filter((g) => g.displayName).map((g) => ({ entraObjectId: g.id, displayName: g.displayName! })),
         );
         await softDeleteGroups(tx, tenantId, page.value.filter((g) => g["@removed"]).map((g) => g.id));
         await applyMemberships(
@@ -167,14 +222,18 @@ export async function syncTenant(
 
     await db.forTenant(tenantId, async (tx) => {
       await refreshTenantDomains(tx, tenantId);
-      await finishSyncRun(tx, runId, { ok: true, usersDeltaLink, groupsDeltaLink, usersChanged });
+      await finishSyncRun(tx, runId, {
+        ok: true, usersDeltaLink, groupsDeltaLink, usersSelection, groupsSelection: GROUP_SELECTION, usersChanged,
+      });
     });
     return { ok: true, usersChanged, usersRemoved, groupsChanged, kind };
   } catch (e) {
     const err = e instanceof Error ? e.message : String(e);
     await db.forTenant(tenantId, (tx) => finishSyncRun(tx, runId, { ok: false, error: err }));
     // Graph answers 410 when a delta token has expired: start again with a full sync.
-    if (e instanceof GraphError && e.status === 410 && kind === "delta") return syncTenant(db, graph, tenantId, { forceFull: true });
+    if (e instanceof GraphError && e.status === 410 && (userLink || groupLink)) {
+      return syncTenant(db, graph, tenantId, { ...opts, forceFull: true });
+    }
     if (e instanceof GraphError && e.isConsentProblem) await markConsentRevoked(db, tenantId);
     return { ok: false, usersChanged, usersRemoved, groupsChanged, kind, error: err };
   }
